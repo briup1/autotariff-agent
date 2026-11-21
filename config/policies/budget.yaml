@@ -1,0 +1,12 @@
+# 每次运行的预算上限。maxAgentTurns 可被 PI_MAX_AGENT_TURNS 覆盖。
+# 只支持扁平 key: value；非正整数或未知键会让启动失败，避免预算被悄悄读错。
+max_agent_turns: 12
+max_attempts: 3
+max_tool_calls: 40
+max_external_actions: 12
+max_wall_time_seconds: 1200
+max_attempt_time_seconds: 360
+max_input_tokens: 100000
+max_output_tokens: 30000
+max_no_progress_attempts: 2
+max_same_action_retries: 1

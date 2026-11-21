@@ -1,0 +1,20 @@
+{
+  "version": "yishengchang-v001",
+  "sourceRequirements": "怡升昌说明.txt",
+  "rules": {
+    "routeSplit": "split the route at the first hyphen; left is origin and right is destination",
+    "inheritRoute": "a blank route cell inherits the nearest previous nonblank route within the same sheet region",
+    "containerFields": {
+      "20GP卖价": ["20'GP", "20GP"],
+      "40GP卖价": ["40GP"],
+      "40HQ卖价": ["40'HQ", "40HC", "40HQ"]
+    },
+    "lssAndRemarks": "preserve LSS text and remarks in 运价备注",
+    "transitPort": "use 中转港 when present",
+    "transitTime": "use 航程 when present",
+    "etdPriority": ["预计开船日期", "开船日期", "有效日期", "开船时间"],
+    "missingYear": "use run_year from the run manifest",
+    "validity": "运价有效开始时间 is run_date and 运价有效结束时间 is ETD",
+    "negativePrices": "preserve negative values and emit a review issue"
+  }
+}

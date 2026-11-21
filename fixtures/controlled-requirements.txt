@@ -1,0 +1,7 @@
+Synthetic engineering fixtures; working interpretation, no business approval.
+Split Route/航线 at first hyphen or equals into origin and destination. Preserve slash strings.
+20GP/40GP/40HQ columns map to matching 卖价 fields. Preserve raw prices, negative values and legitimate source duplicates. Missing prices null.
+Remarks joins LSS then 备注 with ' | '; with neither use an empty string.
+中转港, 航程, 航线代码 preserve original cells or null. ETD preserves source date before host normalization.
+Host normalizes number prices, fills missing 40GP/40HQ from its counterpart, normalizes ETD using frozen year, sets validity start to frozen runDate and end to ETD.
+Styles do not by themselves exclude any quote. Region context and row identity remain source mapped.

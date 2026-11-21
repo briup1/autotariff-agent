@@ -1,0 +1,104 @@
+{
+  "version": "controlled-v001",
+  "previousVersion": null,
+  "sourceRequirements": "controlled-requirements.txt",
+  "approval": "working interpretation only; no business approval",
+  "clauses": [
+    {
+      "id": "routeSplit",
+      "quote": "Split Route/航线 at first hyphen or equals into origin and destination. Preserve slash strings.",
+      "rule": "split first hyphen or equals; left origin, right destination; preserve slash literals",
+      "sourceSpan": {
+        "start": 78,
+        "end": 171,
+        "unit": "utf16-code-units"
+      }
+    },
+    {
+      "id": "containerFields",
+      "quote": "20GP/40GP/40HQ columns map to matching 卖价 fields. Preserve raw prices, negative values and legitimate source duplicates. Missing prices null.",
+      "rule": "map actual container column; missing raw price null; postprocess fill missing 40GP/40HQ from the other when present",
+      "sourceSpan": {
+        "start": 172,
+        "end": 313,
+        "unit": "utf16-code-units"
+      }
+    },
+    {
+      "id": "lssAndRemarks",
+      "quote": "Remarks joins LSS then 备注 with ' | '; with neither use an empty string.",
+      "rule": "join nonempty LSS and remark cell values in that order with ' | '",
+      "sourceSpan": {
+        "start": 314,
+        "end": 385,
+        "unit": "utf16-code-units"
+      }
+    },
+    {
+      "id": "transitPort",
+      "quote": "中转港, 航程, 航线代码 preserve original cells or null. ETD preserves source date before host normalization.",
+      "rule": "preserve raw source value",
+      "sourceSpan": {
+        "start": 386,
+        "end": 485,
+        "unit": "utf16-code-units"
+      }
+    },
+    {
+      "id": "transitTime",
+      "quote": "中转港, 航程, 航线代码 preserve original cells or null. ETD preserves source date before host normalization.",
+      "rule": "preserve raw source value",
+      "sourceSpan": {
+        "start": 386,
+        "end": 485,
+        "unit": "utf16-code-units"
+      }
+    },
+    {
+      "id": "routeCode",
+      "quote": "中转港, 航程, 航线代码 preserve original cells or null. ETD preserves source date before host normalization.",
+      "rule": "preserve raw source value",
+      "sourceSpan": {
+        "start": 386,
+        "end": 485,
+        "unit": "utf16-code-units"
+      }
+    },
+    {
+      "id": "etdPriority",
+      "quote": "Host normalizes number prices, fills missing 40GP/40HQ from its counterpart, normalizes ETD using frozen year, sets validity start to frozen runDate and end to ETD.",
+      "rule": "first mapped ETD column; serialize ISO source dates; normalize according to frozen runYear and final day in annotated/range dates; unknown date null with source retained",
+      "sourceSpan": {
+        "start": 486,
+        "end": 650,
+        "unit": "utf16-code-units"
+      }
+    },
+    {
+      "id": "validity",
+      "quote": "Host normalizes number prices, fills missing 40GP/40HQ from its counterpart, normalizes ETD using frozen year, sets validity start to frozen runDate and end to ETD.",
+      "rule": "start frozen runDate; end normalized ETD, including historical dates",
+      "sourceSpan": {
+        "start": 486,
+        "end": 650,
+        "unit": "utf16-code-units"
+      }
+    }
+  ],
+  "engineeringRules": {
+    "rowIdentity": "sheet!R{row}C{routeColumn}; preserve separate source duplicates",
+    "inheritRoute": "within active header region; merged route blanks inherit previous route",
+    "negativePrices": "preserve without blocking issue",
+    "styles": "record hidden/struck/invisible values; retain because note specifies no exclusion",
+    "postprocess": "fields-v002: trim strings, price number normalization, 40GP/40HQ fallback, ETD and validity relations; unrelated legacy global handlers excluded",
+    "unknownRequiredRules": "prevent consistency success when not independently checked",
+    "contextScope": "Explicit 共享说明 applies to all regions on that sheet; currency, units and other context are local to the declared next table; ambiguous scope requires review.",
+    "extractionComparison": "Compare canonical field projections using the frozen field rules. Equivalent price/date/container/remark normalization may occur during extraction or postprocessing; original source facts and actual raw output remain separately archived."
+  },
+  "derived_expectation_profile": {
+    "scope": "working interpretation consistency",
+    "businessPassEligible": false
+  },
+  "sourceText": "Synthetic engineering fixtures; working interpretation, no business approval.\nSplit Route/航线 at first hyphen or equals into origin and destination. Preserve slash strings.\n20GP/40GP/40HQ columns map to matching 卖价 fields. Preserve raw prices, negative values and legitimate source duplicates. Missing prices null.\nRemarks joins LSS then 备注 with ' | '; with neither use an empty string.\n中转港, 航程, 航线代码 preserve original cells or null. ETD preserves source date before host normalization.\nHost normalizes number prices, fills missing 40GP/40HQ from its counterpart, normalizes ETD using frozen year, sets validity start to frozen runDate and end to ETD.\nStyles do not by themselves exclude any quote. Region context and row identity remain source mapped.\n",
+  "sourceRequirementsDigest": "4b70a519caa674484b0cb465360055339aed5c844c9f2a98be669a534d2d2df6"
+}

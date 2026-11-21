@@ -1,0 +1,14 @@
+node_modules/
+.venv/
+.env.local
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+template_runs/*
+!template_runs/.gitkeep
+dist/
+coverage/
+.tmp/
+.work/
+.agent-teams/
+bots/

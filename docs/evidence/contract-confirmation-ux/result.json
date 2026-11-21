@@ -1,0 +1,65 @@
+{
+  "date": "2026-11-15",
+  "branch": "feature/contract-confirmation-ux",
+  "backendBase": "daf9464",
+  "tests": {
+    "frontend": 45,
+    "api": 11,
+    "total": 56,
+    "failed": 0
+  },
+  "checks": {
+    "typecheck": "PASS",
+    "javascriptSyntax": "PASS",
+    "diffWhitespace": "PASS",
+    "build": "no build script"
+  },
+  "browser": {
+    "surface": "mounted Browser tab",
+    "url": "http://127.0.0.1:60347/?conversation=a2de0528-ed0e-4afb-9951-afceca41de54",
+    "data": "isolated copy of real historical run, no model dispatch",
+    "runId": "run-1794711552895-a6cd63c7",
+    "decision": "BLOCKED",
+    "issueCount": 1899,
+    "recordCount": 262,
+    "desktop": {
+      "width": 1280,
+      "height": 720,
+      "horizontalOverflow": false,
+      "escapeFocusRestored": true
+    },
+    "narrow": {
+      "width": 375,
+      "height": 700,
+      "mode": "iframe with only address updates disabled",
+      "horizontalOverflow": false,
+      "dialogWidth": 343,
+      "buttonHeight": 44,
+      "bottomReachable": true,
+      "closeFocusRestored": true
+    },
+    "previewCancelWritePaths": [],
+    "screenshots": [
+      "desktop-blocked.png",
+      "desktop-preview.png",
+      "narrow-blocked.png",
+      "narrow-preview.png"
+    ],
+    "notVerified": [
+      "new gpt-6.1-sol run",
+      "live-model successful approval and archive",
+      "native mobile viewport"
+    ]
+  },
+  "review": {
+    "verdict": "PASS / approve",
+    "reviewer": "评审工程师",
+    "report": "/Users/ziyun/workdir/remote_project/autotariff-agent/.scratch/contract-confirmation-ux-code-review-c1/review.md",
+    "scope": "C1 and direct frontend regression; R3-R5 carried from original review",
+    "checks": "45 frontend tests rerun independently; previous 11 API passes reused",
+    "codeSha256": "7f6021c7a9f459e650c59c815d62fcd4e782353f87994993a871d77a504bfdf9",
+    "testSha256": "a36aecef86b95f0411e7592e992960576357b45adc100e863c427d7bb1ef9436",
+    "qaApproval": false
+  },
+  "shared3000": "not started or modified"
+}

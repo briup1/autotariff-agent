@@ -1,0 +1,96 @@
+{
+  "date": "2026-11-14",
+  "method": "内置浏览器，同源 iframe 实际 CSS 视口；顶层截图保留外部空白；不是硬件设备模拟",
+  "checks": [
+    {
+      "bodyOverflow": false,
+      "controlFailures": [],
+      "dialogWidth": 343,
+      "footerVisible": true,
+      "height": 812,
+      "kind": "list",
+      "rootOverflow": false,
+      "width": 375
+    },
+    {
+      "bodyOverflow": false,
+      "controlFailures": [],
+      "dialogWidth": 736,
+      "footerVisible": true,
+      "height": 1000,
+      "kind": "list",
+      "rootOverflow": false,
+      "width": 768
+    },
+    {
+      "bodyOverflow": false,
+      "controlFailures": [],
+      "dialogWidth": 960,
+      "footerVisible": true,
+      "height": 1000,
+      "kind": "list",
+      "rootOverflow": false,
+      "width": 1024
+    },
+    {
+      "bodyOverflow": false,
+      "controlFailures": [],
+      "dialogWidth": 960,
+      "footerVisible": true,
+      "height": 1000,
+      "kind": "list",
+      "rootOverflow": false,
+      "width": 1440
+    },
+    {
+      "bodyOverflow": false,
+      "controlFailures": [],
+      "dialogWidth": 343,
+      "footerVisible": true,
+      "height": 812,
+      "kind": "form",
+      "rootOverflow": false,
+      "width": 375
+    },
+    {
+      "bodyOverflow": false,
+      "controlFailures": [],
+      "dialogWidth": 600,
+      "footerVisible": true,
+      "height": 1000,
+      "kind": "form",
+      "rootOverflow": false,
+      "width": 768
+    },
+    {
+      "bodyOverflow": false,
+      "controlFailures": [],
+      "dialogWidth": 600,
+      "footerVisible": true,
+      "height": 1000,
+      "kind": "form",
+      "rootOverflow": false,
+      "width": 1024
+    },
+    {
+      "bodyOverflow": false,
+      "controlFailures": [],
+      "dialogWidth": 600,
+      "footerVisible": true,
+      "height": 1000,
+      "kind": "form",
+      "rootOverflow": false,
+      "width": 1440
+    }
+  ],
+  "contrast": {
+    "secondaryText": 5.99,
+    "controlBorder": 3.77,
+    "focusIndicator": 5.42
+  },
+  "reducedMotion": {
+    "staticRuleVerified": true,
+    "emulationVerified": false
+  },
+  "screenReaderVerified": false
+}

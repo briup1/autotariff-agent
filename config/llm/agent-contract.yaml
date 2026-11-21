@@ -1,0 +1,7 @@
+# 由 src/config.ts 读取：system_prompt 指向主提示词，budget 指向预算文件。
+# 这两处以前没有任何代码读取，改了不生效；现在改动会真的生效。
+version: v001
+provider_env: PI_MODEL_PROVIDER
+model_env: PI_MODEL_ID
+system_prompt: config/llm/system-prompt.md
+budget: config/policies/budget.yaml

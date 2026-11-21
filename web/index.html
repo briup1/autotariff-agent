@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f7fb">
+  <title>AutoTariff Studio</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#message-input">跳到消息输入</a>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="工作会话">
+      <a class="brand" href="/" aria-label="AutoTariff Studio 首页">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M5 24 16 5l11 19M10 17h12M9 24h14"/></svg></span>
+        <span>AutoTariff<span class="brand-subtitle">Studio</span></span>
+      </a>
+      <button class="new-conversation" id="new-conversation"><span aria-hidden="true">＋</span> 新建会话 <kbd>⌘ K</kbd></button>
+      <button class="quiet-button" id="open-plan-library">方案库</button>
+      <div class="sidebar-section-label">工作会话 <span id="conversation-count"></span></div>
+      <nav class="conversation-list" id="conversation-list" aria-label="会话列表"><p class="sidebar-placeholder">正在读取会话…</p></nav>
+      <div class="sidebar-history">
+        <button class="history-toggle" id="history-toggle" aria-expanded="false" aria-controls="history-list"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7m2-4v5l3 2"/></svg><span>历史运行</span><span id="history-count" class="subtle-count"></span><span class="chevron" aria-hidden="true">⌄</span></button>
+        <nav id="history-list" class="history-list" aria-label="历史运行列表" hidden></nav>
+      </div>
+      <div class="sidebar-footer"><span class="local-mark" aria-hidden="true"></span><div>本地工作空间<span>原文件与证据保存在本机</span></div></div>
+    </aside>
+    <button class="sidebar-backdrop" id="sidebar-backdrop" aria-label="关闭会话列表" hidden></button>
+    <main class="main-shell">
+      <header class="topbar">
+        <div class="topbar-context"><button class="icon-button menu-button" id="menu-button" aria-label="打开会话列表" aria-expanded="false" aria-controls="sidebar"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><span class="workspace-label">运价工作台</span><span class="topbar-divider" aria-hidden="true"></span><span class="view-label" id="view-label">工作会话</span></div>
+        <div class="topbar-right"><button class="connection" id="connection-button" title="重新读取连接状态"><span class="connection-dot" id="connection-dot"></span><span id="connection-label">连接中</span></button><div class="budget-summary" id="budget-summary" aria-label="当前任务模型请求用量"><span class="budget-label">模型请求</span><span id="budget-value">读取中</span></div></div>
+      </header>
+      <div class="connection-banner" id="connection-banner" role="status" hidden><span id="connection-error"></span><button id="reconnect-button" class="text-button">重新连接</button></div>
+      <nav class="mobile-tabs" aria-label="工作区视图"><button class="active" data-mobile-tab="chat" aria-pressed="true">对话</button><button data-mobile-tab="activity" aria-pressed="false">执行过程</button><button data-mobile-tab="results" aria-pressed="false">结果证据</button></nav>
+      <div class="workspace" data-mobile-view="chat" id="workspace">
+        <section class="chat-panel" aria-labelledby="conversation-title">
+          <header class="chat-heading"><div><div class="heading-meta" id="conversation-meta">一个会话，一份原文件</div><h1 id="conversation-title">开始新的工作</h1></div><span id="conversation-state"></span></header>
+          <div class="source-context" id="source-context"><div class="source-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 3H6v18h12V7Zm0 0v5h5M9 12h6m-6 4h6"/></svg></div><div class="source-copy"><strong id="source-name">尚未选择原文件</strong><span id="source-requirements">选择试点文件，或上传原文件和本单证说明</span></div><button class="quiet-button" id="choose-source">选择文件</button></div>
+          <p id="selected-plan-summary" class="field-help" hidden></p>
+          <div class="messages-scroll" id="messages-scroll" tabindex="0" aria-label="消息记录"><div class="messages" id="messages"><div class="empty-conversation"><div class="empty-emblem" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="m8 30 12-22 12 22M13 20h14M12 30h16"/></svg></div><h2>让每条运价都有依据。</h2><p>选择原文件，用一句话交代要求。<br>在这里查看回复，在右侧核对执行过程与结果。</p><button class="primary-button" id="empty-start">选择原文件</button><div class="empty-footnote">从原文到结果，每一轮都有记录</div></div></div></div>
+          <div class="composer-area"><div class="composer-notice" id="composer-notice" role="status" hidden></div><form class="composer" id="message-form"><label class="sr-only" for="message-input">输入要求或追问</label><textarea id="message-input" rows="3" maxlength="20000" placeholder="交代抽取要求，或继续追问结果…" aria-describedby="composer-hint"></textarea><div class="composer-bottom"><span class="composer-hint" id="composer-hint">Enter 发送 · Shift + Enter 换行</span><button class="send-button" id="send-button" type="submit" disabled><span id="send-label">发送</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 19V5m-5 5 5-5 5 5"/></svg></button></div></form><div class="composer-caption"><span class="caption-dot" aria-hidden="true"></span><span id="composer-caption">只有发送消息才会发起模型请求</span></div></div>
+        </section>
+        <aside class="evidence-panel" aria-label="执行过程与结果证据">
+          <header class="evidence-heading"><div><span class="evidence-heading-dot" aria-hidden="true"></span><h2>工作证据</h2></div><span class="read-only-label" id="origin-label">等待运行</span></header>
+          <div class="run-context"><label for="run-select">运行记录</label><select id="run-select" disabled><option value="">尚未产生运行</option></select><div class="run-id-row"><code id="run-id">发送要求后生成运行 ID</code><button class="icon-button small-icon" id="copy-run" aria-label="复制运行 ID" title="复制运行 ID" disabled><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 9h11v12H9zM5 15H3V3h12v2"/></svg></button></div><div class="run-status-row" id="run-status-row" hidden></div></div>
+          <nav class="evidence-tabs" aria-label="证据类别"><button class="active" data-evidence-tab="activity" aria-pressed="true">执行过程</button><button data-evidence-tab="results" aria-pressed="false">结果</button><button data-evidence-tab="artifacts" aria-pressed="false">产物</button><button data-evidence-tab="tests" aria-pressed="false">工程测试</button></nav>
+          <div class="attempt-toolbar" id="attempt-toolbar" hidden><label for="attempt-select">查看轮次</label><select id="attempt-select"></select><span id="attempt-status"></span></div>
+          <div class="evidence-scroll" id="evidence-scroll"><div id="evidence-content" class="evidence-content"><div class="panel-empty"><svg aria-hidden="true" viewBox="0 0 48 48"><path d="M16 9h23v31H16zM9 16v24M22 17h11M22 24h11M22 31h6"/></svg><h3>证据会在这里汇集</h3><p>开始一项任务后，查看真实工具记录、每轮结果与独立检查。</p></div></div></div>
+          <footer class="evidence-footer"><span id="evidence-footer-label">尚无运行记录</span><button class="text-button" id="refresh-run">刷新</button></footer>
+        </aside>
+      </div>
+    </main>
+  </div>
+  <dialog class="source-dialog" id="source-dialog" aria-labelledby="source-dialog-title"><form id="source-form"><header class="dialog-header"><div><span class="heading-meta">开始工作会话</span><h2 id="source-dialog-title">选择一份原文件</h2></div><button class="icon-button" type="button" id="close-source" aria-label="关闭文件选择"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></svg></button></header><div class="source-mode-tabs"><button type="button" data-source-mode="sample" class="active" aria-pressed="true">现有文件</button><button type="button" data-source-mode="upload" aria-pressed="false">上传文件</button></div><div id="sample-fields"><label class="field-label" for="source-select">原文件与对应说明</label><select id="source-select" required><option value="">正在读取文件…</option></select><div class="source-detail" id="source-detail"></div></div><div id="upload-fields" hidden><label class="file-drop" for="original-file"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 15V3m-4 4 4-4 4 4M4 14v6h16v-6"/></svg><strong id="original-file-name">选择原文件</strong><span>XLSX、PDF、DOCX、PNG、JPEG，最多 15 MiB</span><input type="file" id="original-file" accept=".xlsx,.pdf,.docx,.png,.jpg,.jpeg"></label><label class="file-drop requirements-drop" for="requirements-file"><strong id="requirements-file-name">选择本单证的抽取说明（可选）</strong><span>TXT 或 Markdown，UTF-8 文本；不提供时 Agent 先产出候选契约</span><input type="file" id="requirements-file" accept=".txt,.md,text/plain,text/markdown"></label><p class="field-help">上传会导入文件副本。给了说明时按说明生成契约；没给说明时 Agent 先观察原文产出候选契约，由你确认后再正式抽取。</p></div><div id="source-plan-fields" hidden><label class="field-label" for="source-plan-select">本次使用的方案</label><select id="source-plan-select"><option value="">不使用方案，沿用说明或首次观察</option></select><p id="source-plan-detail" class="field-help" role="status"></p></div><div class="dialog-error" id="source-error" role="alert" hidden></div><footer class="dialog-footer"><span>选择文件不会调用模型</span><button class="primary-button" type="submit" id="create-conversation">创建会话</button></footer></form></dialog>
+  <dialog class="contract-dialog" id="contract-dialog" aria-labelledby="contract-title" aria-describedby="contract-effect">
+    <header class="dialog-header"><div><span class="heading-meta">人工确认 / CONTRACT</span><h2 id="contract-title">核对这份契约</h2></div><button type="button" class="quiet-button" id="close-contract">关闭</button></header>
+    <p id="contract-effect">批准后，这份契约将成为同说明后续复用的基线。批准不改变本次运行检查结论，也不代表结果已通过业务验收。</p>
+    <p id="contract-status" role="status" aria-live="polite"></p>
+    <p id="contract-error" class="dialog-error" role="alert" hidden></p>
+    <div id="contract-preview-content" class="contract-preview-content"></div>
+    <footer class="dialog-footer"><span>预览、关闭和确认均不会调用模型</span><div><button type="button" class="quiet-button" id="reload-contract">重新读取</button><button type="button" class="primary-button" id="approve-contract" disabled>批准这份契约</button><button type="button" class="primary-button" id="archive-confirmed-contract" hidden>归档为方案</button></div></footer>
+  </dialog>
+  <dialog class="artifact-dialog" id="artifact-dialog" aria-labelledby="artifact-title"><header class="dialog-header"><div><span class="heading-meta" id="artifact-kind">已登记产物</span><h2 id="artifact-title">查看产物</h2></div><button class="icon-button" id="close-artifact" aria-label="关闭产物预览"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></svg></button></header><div class="artifact-meta" id="artifact-meta"></div><pre class="artifact-content" id="artifact-content" tabindex="0">正在读取…</pre><footer class="dialog-footer"><span id="artifact-truncated"></span><a class="primary-button" id="artifact-download" download>下载完整文件</a></footer></dialog>
+  <dialog class="plan-dialog plan-library" id="plan-library-dialog" aria-labelledby="plan-library-title" aria-describedby="plan-library-description">
+    <header class="plan-dialog-heading"><div><span class="plan-eyebrow">规则资产 / PLAN LIBRARY</span><h2 id="plan-library-title">方案库 <span id="plan-count" class="plan-count"></span></h2><p id="plan-library-description">把已确认的规则留在这里，让每次归档都有据可查。</p></div><button class="quiet-button" id="close-plan-library">关闭</button></header>
+    <div class="plan-library-body">
+      <div id="plan-library-status" class="plan-feedback" role="status" aria-live="polite"></div>
+      <div class="dialog-error" id="plan-library-error" role="alert" hidden></div>
+      <button class="quiet-button" id="retry-plan-library" hidden>重新读取</button>
+      <div class="plan-list-heading" aria-hidden="true"><span>方案 / 供应商 / 单证类型</span><span>状态</span><span>最近使用 / 最近结论</span><span>管理</span></div>
+      <div id="plan-library-content" role="list" aria-label="已归档方案"></div>
+    </div>
+    <footer class="plan-dialog-footer"><span>仅保存人工确认的规则</span><div><button class="quiet-button" id="plan-first-source">选择原文件，确认新规则</button><button class="primary-button" id="archive-plan">归档已确认契约</button></div></footer>
+  </dialog>
+  <dialog class="plan-dialog plan-form-dialog" id="plan-form-dialog" aria-labelledby="plan-form-title" aria-describedby="plan-form-description">
+    <form id="plan-form">
+      <header class="plan-dialog-heading"><div><span class="plan-eyebrow">确认规则 / ARCHIVE</span><h2 id="plan-form-title">保存为方案</h2><p id="plan-form-description">核对规则来源，为它取一个下次能认出的名称。</p></div><button class="quiet-button" type="button" id="cancel-plan">取消</button></header>
+      <div class="plan-form-body">
+        <p id="plan-form-status" class="plan-feedback" role="status" aria-live="polite"></p>
+        <button class="quiet-button" type="button" id="retry-plan-archive" hidden>重新读取契约</button>
+        <fieldset id="plan-fields">
+          <div id="plan-archive-fields" class="plan-field-section"><div class="plan-section-title"><span aria-hidden="true">01</span><h3>确认契约</h3></div><label class="field-label" for="plan-contract">规则来源</label><select id="plan-contract" aria-describedby="plan-contract-summary" required></select><p class="plan-field-help" id="plan-contract-summary"></p></div>
+          <div id="plan-version-fields" hidden><label class="field-label" for="plan-contract-preview">待确认的新契约</label><pre id="plan-contract-preview" tabindex="0"></pre><label class="plan-version-confirm"><input id="confirm-plan-version" type="checkbox" disabled>我已核对新契约，同意将其保存为本方案的新版本。</label></div><div id="plan-metadata-fields" class="plan-field-section"><div class="plan-section-title"><span aria-hidden="true">02</span><h3>方案信息</h3></div><label class="field-label" for="plan-name">方案名称 <span>必填</span></label><input id="plan-name" maxlength="160" aria-describedby="plan-name-help plan-error" required><p class="plan-field-help" id="plan-name-help">工作区内名称唯一，建议使用“供应商 + 用途”。</p>
+          <div id="plan-source-fields" class="plan-source-fields"><div><label class="field-label" for="plan-supplier">供应商</label><input id="plan-supplier" maxlength="160" aria-describedby="plan-error" required></div><div><label class="field-label" for="plan-doc-type">单证类型</label><input id="plan-doc-type" maxlength="160" aria-describedby="plan-error" required></div></div></div>
+        </fieldset>
+        <p class="dialog-error" id="plan-error" role="alert" tabindex="-1" hidden></p>
+      </div>
+      <footer class="plan-dialog-footer"><span>保存不会调用模型</span><button class="primary-button" id="save-plan" type="submit">保存方案</button></footer>
+    </form>
+  </dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

@@ -1,0 +1,104 @@
+{
+  "version": "yishengchang-v002",
+  "previousVersion": "v001 prototype (not approved)",
+  "sourceRequirements": "怡升昌说明.txt",
+  "approval": "working interpretation only; no business approval",
+  "clauses": [
+    {
+      "id": "routeSplit",
+      "quote": "源文件航线一栏，需要拆程起运港和目的港，填入起运港和目的港",
+      "rule": "split first hyphen or equals; left origin, right destination; preserve slash literals",
+      "sourceSpan": {
+        "start": 0,
+        "end": 29,
+        "unit": "utf16-code-units"
+      }
+    },
+    {
+      "id": "containerFields",
+      "quote": "20'GP或20GP填入标准格式20GP卖价\r\n40'HQ或40HC填入标准格式40HQ卖价\r\n40GP填入标准格式40GP卖价",
+      "rule": "map actual container column; missing raw price null; postprocess fill missing 40GP/40HQ from the other when present",
+      "sourceSpan": {
+        "start": 31,
+        "end": 95,
+        "unit": "utf16-code-units"
+      }
+    },
+    {
+      "id": "lssAndRemarks",
+      "quote": "LSS (默认预付），可以申请到付填入运价备注\r\n中转港填入中转港\r\n航程填入航程\r\n备注填入运价备注",
+      "rule": "join nonempty LSS and remark cell values in that order with ' | '",
+      "sourceSpan": {
+        "start": 97,
+        "end": 148,
+        "unit": "utf16-code-units"
+      }
+    },
+    {
+      "id": "transitPort",
+      "quote": "中转港填入中转港",
+      "rule": "preserve raw source value",
+      "sourceSpan": {
+        "start": 122,
+        "end": 130,
+        "unit": "utf16-code-units"
+      }
+    },
+    {
+      "id": "transitTime",
+      "quote": "航程填入航程",
+      "rule": "preserve raw source value",
+      "sourceSpan": {
+        "start": 132,
+        "end": 138,
+        "unit": "utf16-code-units"
+      }
+    },
+    {
+      "id": "routeCode",
+      "quote": "航线代码填入航线代码",
+      "rule": "preserve raw source value",
+      "sourceSpan": {
+        "start": 248,
+        "end": 258,
+        "unit": "utf16-code-units"
+      }
+    },
+    {
+      "id": "etdPriority",
+      "quote": "预计开船日期或开船日期或有效日期填入ETD，用标准格式，例如8月7日则填入2026-08-07；例如8月4日晚开14日，则填入2026-08-14；例如8.1-30，则填入2026-08-30",
+      "rule": "first mapped ETD column; serialize ISO source dates; normalize according to frozen runYear and final day in annotated/range dates; unknown date null with source retained",
+      "sourceSpan": {
+        "start": 150,
+        "end": 246,
+        "unit": "utf16-code-units"
+      }
+    },
+    {
+      "id": "validity",
+      "quote": "运价有效开始时间填今日，运价有效结束时间=ETD",
+      "rule": "start frozen runDate; end normalized ETD, including historical dates",
+      "sourceSpan": {
+        "start": 260,
+        "end": 284,
+        "unit": "utf16-code-units"
+      }
+    }
+  ],
+  "engineeringRules": {
+    "rowIdentity": "sheet!R{row}C{routeColumn}; preserve separate source duplicates",
+    "inheritRoute": "within active header region; merged route blanks inherit previous route",
+    "negativePrices": "preserve without blocking issue",
+    "styles": "record hidden/struck/invisible values; retain because note specifies no exclusion",
+    "postprocess": "fields-v002: trim strings, price number normalization, 40GP/40HQ fallback, ETD and validity relations; unrelated legacy global handlers excluded",
+    "unknownRequiredRules": "prevent consistency success when not independently checked",
+    "contextScope": "Explicit 共享说明 applies to all regions on that sheet; currency, units and other context are local to the declared next table; ambiguous scope requires review.",
+    "extractionComparison": "Compare canonical field projections using the frozen field rules. Equivalent price/date/container/remark normalization may occur during extraction or postprocessing; original source facts and actual raw output remain separately archived."
+  },
+  "derived_expectation_profile": {
+    "scope": "working interpretation consistency",
+    "businessPassEligible": false
+  },
+  "sourceText": "源文件航线一栏，需要拆程起运港和目的港，填入起运港和目的港\r\n20'GP或20GP填入标准格式20GP卖价\r\n40'HQ或40HC填入标准格式40HQ卖价\r\n40GP填入标准格式40GP卖价\r\nLSS (默认预付），可以申请到付填入运价备注\r\n中转港填入中转港\r\n航程填入航程\r\n备注填入运价备注\r\n预计开船日期或开船日期或有效日期填入ETD，用标准格式，例如8月7日则填入2026-08-07；例如8月4日晚开14日，则填入2026-08-14；例如8.1-30，则填入2026-08-30\r\n航线代码填入航线代码\r\n运价有效开始时间填今日，运价有效结束时间=ETD",
+  "sourceRequirementsDigest": "08a9b66ee088173ca97e597644eafbd0753e26b71a0419a6ed7c06ebfeba15ec"
+}

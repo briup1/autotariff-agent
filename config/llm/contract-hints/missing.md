@@ -1,0 +1,1 @@
+No confirmed contract exists for this document. Inspect the source, then call draft_contract. If no requirements file was provided, declare requirementsSource as observed, put your assumptions in notes and questions, and say clearly that a person must confirm the contract.

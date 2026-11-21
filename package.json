@@ -1,0 +1,35 @@
+{
+  "name": "autotariff-agent",
+  "version": "1.0.0",
+  "description": "Host-owned durable freight extraction with independent source validation",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest run",
+    "start": "node --env-file=.env.local --import tsx src/index.ts",
+    "web": "node --env-file-if-exists=.env.local --env-file=config/web.env --import tsx src/web/server.ts",
+    "typecheck": "tsc --noEmit",
+    "verify:offline": "node --import tsx src/verify-offline.ts",
+    "verify:live": "node --env-file=.env.local --import tsx src/verify-live.ts all",
+    "verify:reinstall": "node --import tsx src/verify-reinstall.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@earendil-works/chord": "^1.5.0",
+    "@earendil-works/pi-ai": "^1.5.0",
+    "@earendil-works/pi-durable": "^1.5.0",
+    "@earendil-works/pi-schema": "^1.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "private": true
+}

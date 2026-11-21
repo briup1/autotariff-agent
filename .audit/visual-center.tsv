@@ -1,0 +1,15 @@
+ts	phase	decision	why	evidence	result
+2026-11-03T05:50:24Z	frame	建立产品经理、架构、开发与验收职责，先核对既有闭环再接页面	用户需要真实对话入口和可视化结果，产品验收必须有边界	docs/visual-center-workplan.md	open
+2026-11-03T05:53:19Z	baseline	类型检查与原有54项离线测试通过	新增页面前记录现有真实行为	tests/	open
+2026-11-03T05:53:19Z	budget	新任务上限设为1000次实际模型调用，保留旧预算记录	用户明确补充授权，单运行安全上限不变	docs/visual-center-workplan.md	open
+2026-11-03T06:01:54Z	design	选择同进程服务并加入持久请求身份和许可证据投影	跨模型评审认为子进程恢复协议超出本轮产品范围	docs/visual-center-design.md	open
+2026-11-03T06:01:54Z	budget-check	验证第1000次可预留，第1001次拒绝，旧任务行不变	调用上限必须由实际账本执行	tests/web-budget.test.ts	tests green
+2026-11-03T06:42:22Z	baseline-evidence	补充原54项基线的已保留报告位置	最初日志仅指向测试目录不足以独立复核	template_runs/offline-1793678923469/vitest.json	historical baseline PASS
+2026-11-03T06:42:22Z	adapter	真实浏览器发现NaN费用导致Pi持久化失败，先离线复现后移除NaN写入	SDK协议要求严格JSON，实际金额继续记未知	tests/model-adapter.test.ts	red then green; old uncertain receipt preserved
+2026-11-03T06:42:22Z	review	修复发送确认中断丢请求身份、连续追问丢上下文和产物错误显示零记录	独立审查复现了重复收费与错误结果含义	tests/web-client.test.ts	tests green
+2026-11-03T06:42:22Z	browser	真实抽取、结果追问、上传、历史修复和桌面窄屏已验证	直接检查实际页面、回执与产物	template_runs/visual-center-acceptance/browser-summary.json	verified with stated screenshot limitation
+2026-11-03T06:42:22Z	budget-preservation	本轮占用18次调用其中15完成3不确定，旧任务76条动作及状态摘要未变	不重发回执不确定动作且不修改原预算	template_runs/visual-center-acceptance/budget-after.json	verified
+2026-11-03T06:42:22Z	regression	最终类型检查及66项离线测试通过，0失败0跳过	最终代码变更后重新验证受影响与原闭环	template_runs/offline-1793688047254/vitest.json	tests green
+2026-11-03T06:50:04Z	product	产品经理12项验收通过，旧轮次结论偏差已修正	按冻结标准闭环而不扩大业务功能	docs/visual-center-product-acceptance.md	PASS
+2026-11-03T06:50:04Z	visual	补充受控加载与缺产物状态，界面不将读取失败显示为零结果	关键状态在真实页面上直接观察	template_runs/visual-center-acceptance/loading-and-missing.json	verified
+2026-11-03T06:54:43Z	handoff	独立审计通过，本地服务与可继续操作页面已保留	最终交付实际可运行页面和可核对证据	docs/visual-center-final-audit.md	PASS
