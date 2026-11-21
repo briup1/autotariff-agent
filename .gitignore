@@ -12,3 +12,5 @@ coverage/
 .work/
 .agent-teams/
 bots/
+/factory/jobs/
+/.worktrees/
