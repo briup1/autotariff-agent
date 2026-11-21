@@ -128,11 +128,16 @@ it("C17 initial source dependency failure stops at the actual tool gateway befor
     await import("../src/closure/runtime.js");
   const { PROJECT_ROOT } = await import("../src/closure/paths.js");
   const { resolve } = await import("node:path");
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
   const { BACKGROUND_CONTEXT } = await import("@earendil-works/chord/context");
+  const root = await mkdtemp(resolve(tmpdir(), "missing-python-test-"));
+  const sourcePath = resolve(root, "source.xlsx");
+  await writeFile(sourcePath, "source identity");
   const r = new ClosureRuntime({
     provider: "offline",
     modelId: "none",
-    sourcePath: resolve(PROJECT_ROOT, "template_runs/live-fixtures/small.xlsx"),
+    sourcePath,
     pythonBin: resolve(PROJECT_ROOT, ".tmp/missing-python"),
     runDate: "2026-11-03",
     runYear: 2026,
@@ -153,5 +158,6 @@ it("C17 initial source dependency failure stops at the actual tool gateway befor
     expect(r.manifest.usage.agentTurns).toBe(0);
   } finally {
     r.close();
+    await rm(root, { recursive: true, force: true });
   }
 });

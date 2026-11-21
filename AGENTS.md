@@ -22,6 +22,6 @@ Run `factory/checks.sh` for the factory gate: dependency setup when absent, `npm
 
 ## Software factory
 
-In Claude Code, `/factory run` processes open GitHub issues labeled `factory` through intake, spec, build, gate, review and approval. The reference implementation can push branches and merge PRs automatically; do not run it without explicit authorization. Runtime state is in ignored `factory/jobs/`; `factory/bin/job` is its only writer. The dashboard can be served locally with `cd factory && python3 -m http.server --bind 127.0.0.1`, then opened at http://localhost:8000/dashboard.html.
+In Claude Code, `/factory run` processes open GitHub issues labeled `factory` through intake, spec, build, gate, review and approval. Jobs can push branches and open PRs; merges require a human and automatic merging is disabled. Do not run jobs without explicit authorization. Runtime state is in ignored `factory/jobs/`; `factory/bin/job` is its only writer. The dashboard can be served locally with `cd factory && python3 -m http.server --bind 127.0.0.1`, then opened at http://localhost:8000/dashboard.html.
 
 Jobs use isolated checkouts under ignored `.worktrees/<job-id>/`. Exclude `.worktrees/` when a tool does not honor `.gitignore`. Factory files are GPLv3; see `factory/LICENSE`.

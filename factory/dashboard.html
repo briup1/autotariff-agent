@@ -374,6 +374,10 @@ function links(job) {
   return out.join('')
 }
 
+function costLabel(job) {
+  return job.cost_usd == null ? 'cost unknown' : `$${Number(job.cost_usd).toFixed(2)}`
+}
+
 function card(job, rounds) {
   const live = LIVE.has(job.stage)
   const human = job.stage === 'needs-human'
@@ -385,7 +389,7 @@ function card(job, rounds) {
   const risk = job.intake?.risk
   const meta = [
     risk ? `<span class="risk-${esc(risk)}">${esc(risk)}</span>` : '',
-    `<span>$${Number(job.cost_usd).toFixed(2)}</span>`,
+    `<span>${costLabel(job)}</span>`,
     `<span>${elapsed(job)}</span>`,
   ].join('')
   return `
@@ -429,8 +433,9 @@ async function render() {
     $('banner').innerHTML = banner
   }
   const running = jobs.filter((j) => LIVE.has(j.stage)).length
-  const cost = jobs.reduce((sum, j) => sum + Number(j.cost_usd), 0)
-  $('totals').textContent = `${running} running · $${cost.toFixed(2)} API-equivalent`
+  const cost = jobs.some(j => j.cost_usd == null) ? 'cost unknown'
+    : `$${jobs.reduce((sum, j) => sum + Number(j.cost_usd), 0).toFixed(2)} API-equivalent`
+  $('totals').textContent = `${running} running · ${cost}`
 }
 
 async function poll() {
@@ -503,7 +508,7 @@ const firstLines = new Map()
 async function refreshDrawer() {
   const job = jobs.find((j) => j.id === openJobId)
   if (!job) return
-  $('d-num').textContent = `${job.id} · ${job.stage}${job.round ? ` · round ${job.round}` : ''} · $${Number(job.cost_usd).toFixed(2)} · ${elapsed(job)}`
+  $('d-num').textContent = `${job.id} · ${job.stage}${job.round ? ` · round ${job.round}` : ''} · ${costLabel(job)} · ${elapsed(job)}`
   $('d-title').textContent = job.title
   $('d-links').innerHTML = links(job)
 
