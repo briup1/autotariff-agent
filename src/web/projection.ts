@@ -128,8 +128,12 @@ export class RunProjection {
     }
     return values;
   }
+  // 只读投影登记产物的实际可用性，不补造或修复历史结果。
   async detail(runId: string, selected?: string, offset = 0, limit = 50): Promise<RunDetail> {
     const manifest = this.manifest(runId), attemptId = selected ?? manifest.currentAttemptId ?? undefined;
+    const publicRefs = this.refs(manifest);
+    // 与下载接口使用同一公开引用，避免暴露私有或被同路径引用覆盖的产物。
+    const isPublic = (ref: ArtifactRef) => publicRefs.some((entry) => entry.relativePath === ref.relativePath && entry.artifactId === ref.artifactId && entry.sha256 === ref.sha256 && entry.kind === ref.kind);
     if (selected && !manifest.attempts.includes(selected)) throw new WebError(404, "该运行没有此轮次。");
     const attempt = attemptId ? manifest.attemptStates?.[attemptId] : undefined;
     const attempts: RunDetail["attempts"] = [];
@@ -137,9 +141,12 @@ export class RunProjection {
     let recordStatus: RunDetail["records"]["status"] = attempt?.finalResult ? "error" : "pending";
     for (const entry of Object.values(manifest.attemptStates ?? {})) {
       const reportMissing = !entry.validation && (entry.status === "VALIDATED" || (manifest.binding?.planId && manifest.phase === "TERMINAL"));
-      const view: RunDetail["attempts"][number] = { id: entry.attemptId, parentAttemptId: entry.parentAttemptId, status: entry.status, route: entry.route, reportStatus: entry.validation || reportMissing ? "error" : "pending" };
+      const view: RunDetail["attempts"][number] = { id: entry.attemptId, parentAttemptId: entry.parentAttemptId, status: entry.status, route: entry.route, reportStatus: entry.validation || reportMissing ? "error" : "pending", xlsxStatus: entry.resultXlsx ? "error" : "missing" };
       if (reportMissing) artifactError = "检查报告未登记，无法确认检查问题。";
-      if (entry.resultXlsx) view.xlsxPath = entry.resultXlsx.relativePath;
+      if (entry.resultXlsx && isPublic(entry.resultXlsx) && await this.artifacts.exists(entry.resultXlsx)) {
+        view.xlsxStatus = "available";
+        view.xlsxPath = entry.resultXlsx.relativePath;
+      }
       try {
         if (entry.validation) {
           const report = await this.json<ValidationReport>(entry.validation);
@@ -150,6 +157,8 @@ export class RunProjection {
       try {
         if (entry.finalResult) {
           const rows = await this.json<Record<string, unknown>[]>(entry.finalResult);
+          if (!Array.isArray(rows) || rows.some((row) => !row || typeof row !== "object" || Array.isArray(row))) throw new Error("最终结果不是记录数组。");
+          if (isPublic(entry.finalResult)) view.finalResultPath = entry.finalResult.relativePath;
           view.recordCount = rows.length;
           if (entry.attemptId === attemptId) { records = rows; recordStatus = "available"; }
         }

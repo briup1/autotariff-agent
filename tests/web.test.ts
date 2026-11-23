@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { request } from "node:http";
+import { createContext, runInContext } from "node:vm";
+import type { RunManifest } from "../src/closure/models.js";
 import { createWorkbenchServer } from "../src/web/server.js";
 import { WorkbenchService, type RunJobContext, type WorkbenchOptions } from "../src/web/service.js";
 import { ArtifactStore } from "../src/closure/artifacts.js";
@@ -92,6 +94,83 @@ async function makeCandidateRun(context: RunJobContext, requirementsDigest: stri
   } finally { controller.close(manifest); }
 }
 
+// 离线登记两轮结果，路径刻意不含轮次编号，避免下载入口靠文件名猜测。
+async function savedResults(xlsxState = "missing", finalState = "available") {
+  const store = new ArtifactStore(root), controller = new ClosureController(store, root, DEFAULT_BUDGET);
+  const manifest = await controller.startRun(resolve(root, "source.xlsx"), { version: "offline" }, "2026-11-03", 2026);
+  const rows = [
+    { id: "first", port: "SINGAPORE", price: 250, sourceId: "Rates!R2C1", coordinates: { row: 2, column: 1 } },
+    { id: "second", port: "TOKYO", price: 310, sourceId: "Rates!R3C1", coordinates: { row: 3, column: 1 } },
+  ];
+  const bytes = Buffer.from(finalState === "invalid" ? "not JSON" : finalState === "object" ? '{"rows":[]}' : JSON.stringify(finalState === "empty" ? [] : rows, null, 2) + "\n");
+  try {
+    const plan = await store.put(manifest.runId, "archive/plan.json", "{}", "plan");
+    const parser = await store.put(manifest.runId, "archive/parser.py", "print('offline fixture')", "parser");
+    const first: NonNullable<RunManifest["attemptStates"]>[string] = { attemptId: "saved-old", parentAttemptId: null, status: "VALIDATED", plan, parser, inputSnapshotSha256: manifest.sourceSha256 };
+    if (finalState !== "missing") first.finalResult = await store.put(manifest.runId, "archive/reused-final.json", bytes, finalState === "private" ? "model-response" : "final-result");
+    first.rawResult = await store.put(manifest.runId, "archive/raw.json", '[{"wrong":"raw"}]', "raw-result");
+    first.validation = await store.put(manifest.runId, "reports/old.json", JSON.stringify({ status: "REVIEW", issues: [] }), "validation-report");
+    const workbook = await exportRecords(PYTHON, [{ port: "OTHER", sourceId: "Other!R1C1" }]);
+    if (xlsxState !== "missing") first.resultXlsx = await store.put(manifest.runId, "archive/reused-book.xlsx", workbook, xlsxState === "private" ? "model-response" : "result-xlsx");
+    const second = {
+      attemptId: "saved-new", parentAttemptId: "saved-old", status: "VALIDATED" as const, plan, parser, inputSnapshotSha256: manifest.sourceSha256,
+      finalResult: await store.put(manifest.runId, "different/final.json", '[{"port":"OTHER","sourceId":"Other!R1C1"}]', "final-result"),
+      resultXlsx: await store.put(manifest.runId, "different/book.xlsx", workbook, "result-xlsx"),
+      validation: await store.put(manifest.runId, "reports/new.json", JSON.stringify({ status: "REVIEW", issues: [{ issueId: "one", code: "REVIEW", stage: "validation", message: "保留原问题", sourceIds: [], resultIds: [] }] }), "validation-report"),
+    };
+    // 同名未登记文件、输入及原始结果均不能成为最终下载入口。
+    await store.put(manifest.runId, "unregistered/final_result.json", bytes, "final-result");
+    manifest.attempts = [first.attemptId, second.attemptId]; manifest.currentAttemptId = first.attemptId;
+    manifest.attemptStates = { [first.attemptId]: first, [second.attemptId]: second };
+    await controller.stop(manifest, "REVIEW", "离线结果夹具，不认证业务正确性");
+    if (xlsxState === "deleted") await rm(store.path(manifest.runId, first.resultXlsx!.relativePath));
+    if (xlsxState === "tampered") await writeFile(store.path(manifest.runId, first.resultXlsx!.relativePath), "changed");
+    if (finalState === "deleted") await rm(store.path(manifest.runId, first.finalResult!.relativePath));
+    if (finalState === "tampered") await writeFile(store.path(manifest.runId, first.finalResult!.relativePath), "changed");
+    await writeFile(resolve(runsRootFor(root), "live-acceptance.json"), JSON.stringify({ reuse: { runId: manifest.runId } }));
+    return { runId: manifest.runId, rows, bytes, store };
+  } finally { controller.close(manifest); }
+}
+
+// 用最小 DOM 执行真实结果渲染，读取其实际表格和下载链接。
+async function resultPage(data: RunDetail) {
+  class Node {
+    children: Node[] = [];
+    textContent = "";
+    tagName = "";
+    href = "";
+    // DOM 工具需要标签名以构造结果表。
+    constructor(tag = "") { this.tagName = tag; }
+    // 保留真实表格节点及链接顺序。
+    append(...nodes: Node[]) { this.children.push(...nodes); }
+    // 此处不检查无关属性，但保留真实客户端构造路径。
+    setAttribute() {}
+    // 接口测试只读取渲染结果，交互由客户端专项测试执行。
+    addEventListener() {}
+  }
+  // 递归定位真实渲染生成的元素。
+  const find = (node: Node, tag: string): Node[] => [...(node.tagName === tag ? [node] : []), ...node.children.flatMap(child => find(child, tag))];
+  const code = await readFile(resolve(PROJECT_ROOT, "web/app.js"), "utf8");
+  const context = createContext({ state: { run: data, runId: data.run.runId }, URLSearchParams, document: { createElement: (tag: string) => new Node(tag), createDocumentFragment: () => new Node(), createElementNS: (_ns: string, tag: string) => new Node(tag) }, number: String,
+    // 与运行提示和状态样式解耦，只执行结果页的真实业务展示。
+    runCallout: () => null, badge: (label: string) => Object.assign(new Node(), { textContent: label }), sectionTitle: () => new Node(),
+  });
+  runInContext(code.slice(code.indexOf("const statuses ="), code.indexOf("const operations =")) + code.slice(code.indexOf("const iconPaths ="), code.indexOf("function bytes(")) + code.slice(code.indexOf("function isResultDate("), code.indexOf("function renderArtifacts(")), context);
+  const node = runInContext("renderResults()", context) as Node;
+  return { downloads: find(node, "a").map(link => ({ label: link.textContent, href: link.href })), rows: find(node, "tbody").flatMap(body => body.children.map(row => row.children.slice(2).map(cell => cell.textContent))) };
+}
+
+// 对比账本、动作、预算与所有仍存在的登记文件，证明浏览操作没有写回。
+async function savedSnapshot(runId: string) {
+  const projection = app!.service.projection, manifest = projection.manifest(runId);
+  const artifacts: Record<string, string | null> = {};
+  for (const ref of projection.refs(manifest)) {
+    try { artifacts[ref.relativePath] = (await readFile(projection.artifacts.path(runId, ref.relativePath))).toString("base64"); }
+    catch { artifacts[ref.relativePath] = null; }
+  }
+  return { manifest, actions: projection.actions(runId), budget: projection.budget(), artifacts, manifestBytes: (await readFile(projection.artifacts.path(runId, "run_manifest.json"))).toString("base64") };
+}
+
  describe("local conversational API", () => {
   it("browses without a model key and rejects sending with a useful reason", async () => {
     await start({ modelConfigured: () => false });
@@ -178,6 +257,80 @@ async function makeCandidateRun(context: RunJobContext, requirementsDigest: stri
     expect(missingReport.run.recordCount).toBe(1);
     expect((await fetch(url + `/api/runs/${runId}?attempt=attempt-999`)).status).toBe(404);
     expect((await fetch(url + `/api/runs/${runId}?limit=-1`)).status).toBe(400);
+  });
+
+  it.each(["missing", "available", "deleted", "tampered", "private"])("projects workbook %s and downloads the selected complete final JSON without writes", async xlsxState => {
+    const fixture = await savedResults(xlsxState);
+    await start({ modelConfigured: () => false, runner: async () => { throw new Error("只读浏览不得执行模型或抽取"); } });
+    const before = await savedSnapshot(fixture.runId);
+    const response = await fetch(url + `/api/runs/${fixture.runId}?attempt=saved-old&offset=0&limit=2`);
+    const detail = await response.json() as RunDetail;
+    expect(detail.run).toMatchObject({ label: "真实复用 · Excel", decision: "REVIEW", issueCount: 0 });
+    expect(detail.records.items).toEqual(fixture.rows);
+    const attempt = detail.attempts[0];
+    expect(attempt.xlsxStatus).toBe(xlsxState === "available" ? "available" : xlsxState === "missing" ? "missing" : "error");
+    expect(attempt.finalResultPath).toBe("archive/reused-final.json");
+    const page = await resultPage(detail);
+    expect(page.rows).toEqual(fixture.rows.map(row => Object.values(row).map(value => typeof value === "object" ? JSON.stringify(value, null, 2) : String(value))));
+    expect(page.downloads.map(link => link.label)).toEqual([xlsxState === "available" ? "下载结果 Excel" : "下载最终 JSON"]);
+    const download = await fetch(url + page.downloads[0].href);
+    expect(download.status).toBe(200);
+    if (xlsxState === "available") {
+      const preview = await (await fetch(url + `/api/artifacts?runId=${fixture.runId}&path=archive/reused-book.xlsx`)).json();
+      expect(preview.sheets[0].rows[1]).toEqual(["OTHER", "Other!R1C1"]);
+    } else {
+      expect(download.headers.get("content-disposition")).toContain("reused-final.json");
+      const bytes = Buffer.from(await download.arrayBuffer());
+      expect(bytes).toEqual(fixture.bytes);
+      expect(JSON.parse(bytes.toString())).toEqual(detail.records.items);
+    }
+    const partial = await (await fetch(url + `/api/runs/${fixture.runId}?attempt=saved-old&offset=1&limit=1`)).json() as RunDetail;
+    expect(partial.records).toMatchObject({ total: 2, offset: 1, items: [fixture.rows[1]] });
+    const full = await fetch(url + `/api/artifacts?runId=${fixture.runId}&path=${partial.attempts[0].finalResultPath}&download=1`);
+    expect(Buffer.from(await full.arrayBuffer())).toEqual(fixture.bytes);
+    expect(JSON.parse(fixture.bytes.toString())[0]).not.toHaveProperty("当前页面提示");
+    const next = await (await fetch(url + `/api/runs/${fixture.runId}?attempt=saved-new`)).json() as RunDetail;
+    expect(next.records.items).toEqual([{ port: "OTHER", sourceId: "Other!R1C1" }]);
+    expect(next.attempts[1]).toMatchObject({ xlsxStatus: "available", xlsxPath: "different/book.xlsx", finalResultPath: "different/final.json", issueCount: 1, validationStatus: "REVIEW" });
+    expect((await resultPage(next)).downloads[0].href).toContain("different%2Fbook.xlsx");
+    expect((await fetch(url + `/api/artifacts?runId=${fixture.runId}&path=unregistered/final_result.json&download=1`)).status).toBe(404);
+    if (["deleted", "tampered"].includes(xlsxState)) expect((await fetch(url + `/api/artifacts?runId=${fixture.runId}&path=archive/reused-book.xlsx&download=1`)).status).toBe(409);
+    expect(await savedSnapshot(fixture.runId)).toEqual(before);
+    await rm(fixture.store.path(fixture.runId, "reports/old.json"));
+    const reportMissingBefore = await savedSnapshot(fixture.runId);
+    const noReport = await app!.service.projection.detail(fixture.runId);
+    expect(noReport.attempts[0]).toMatchObject({ reportStatus: "error", finalResultPath: "archive/reused-final.json" });
+    expect(noReport.records.items).toEqual(fixture.rows);
+    expect(noReport.run.decision).toBe("REVIEW");
+    expect((await resultPage(noReport)).downloads).toEqual(page.downloads);
+    expect(await savedSnapshot(fixture.runId)).toEqual(reportMissingBefore);
+  });
+
+  it.each(["missing", "deleted", "tampered", "invalid", "object", "empty", "private"])("withholds final JSON state %s unless a public saved record array is readable", async finalState => {
+    const fixture = await savedResults("missing", finalState);
+    await start({ modelConfigured: () => false });
+    const before = await savedSnapshot(fixture.runId);
+    const detail = await app!.service.projection.detail(fixture.runId);
+    expect(detail.records.status).toBe(finalState === "missing" ? "pending" : ["empty", "private"].includes(finalState) ? "available" : "error");
+    expect(detail.attempts[0].finalResultPath).toBe(finalState === "empty" ? "archive/reused-final.json" : undefined);
+    expect((await resultPage(detail)).downloads.map(link => link.label)).toEqual(finalState === "empty" ? ["下载最终 JSON"] : []);
+    const response = await fetch(url + `/api/artifacts?runId=${fixture.runId}&path=archive/reused-final.json&download=1`);
+    expect(response.status).toBe(["missing", "private"].includes(finalState) ? 404 : ["deleted", "tampered"].includes(finalState) ? 409 : 200);
+    if (finalState === "empty") {
+      expect(detail.records).toMatchObject({ total: 0, items: [] });
+      expect(Buffer.from(await response.arrayBuffer())).toEqual(fixture.bytes);
+    }
+    expect(await savedSnapshot(fixture.runId)).toEqual(before);
+  });
+
+  it("keeps download-time digest rejection after a previously available result changes", async () => {
+    const fixture = await savedResults();
+    await start();
+    const detail = await app!.service.projection.detail(fixture.runId);
+    const page = await resultPage(detail);
+    await writeFile(fixture.store.path(fixture.runId, detail.attempts[0].finalResultPath!), "changed after rendering");
+    expect((await fetch(url + page.downloads[0].href)).status).toBe(409);
+    expect((await app!.service.projection.detail(fixture.runId)).attempts[0].finalResultPath).toBeUndefined();
   });
 
   it("rejects cross-origin, hostile Host, malformed payloads and arbitrary paths", async () => {

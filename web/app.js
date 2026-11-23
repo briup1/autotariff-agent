@@ -574,6 +574,7 @@ function resultDateHint(record) {
   return cell;
 }
 // 保留原结果与报告的呈现，并在独立列展示当前页面的日期观察。
+// 按当前轮次的登记与读取状态展示结果入口，不在浏览时生成产物。
 function renderResults() {
   const detail = state.run;
   const fragment = document.createDocumentFragment();
@@ -592,7 +593,7 @@ function renderResults() {
   summary.append(el('strong', '', resultAvailable ? number(detail.records.total) : detail.records.status === 'error' ? '读取失败' : '未产生'), el('span', '', resultAvailable ? '条结果记录' : '结果记录'));
   summary.append(badge(attempt.reportStatus === 'error' ? 'REPORT_UNAVAILABLE' : attempt.validationStatus || '尚未检查'));
   fragment.append(summary);
-  if (attempt.xlsxPath) {
+  if (attempt.xlsxStatus === 'available' && attempt.xlsxPath) {
     const bar = el('div', 'result-actions');
     const xlsx = el('a', 'primary-button', '下载结果 Excel');
     xlsx.href = artifactUrl(attempt.xlsxPath, true);
@@ -601,6 +602,16 @@ function renderResults() {
     preview.addEventListener('click', () => openArtifact({ path: attempt.xlsxPath, label: `第 ${detail.attempts.findIndex((item) => item.id === attempt.id) + 1} 轮结果 Excel`, kind: 'result-xlsx', bytes: 0 }));
     bar.append(xlsx, preview);
     fragment.append(bar);
+  } else {
+    fragment.append(el('p', 'evidence-note result-workbook-note', attempt.xlsxStatus === 'error' ? '本轮结果工作簿已登记但缺失或校验失败。' : '本轮未生成结果工作簿'));
+    if (attempt.finalResultPath) {
+      const bar = el('div', 'result-actions');
+      const json = el('a', 'primary-button', '下载最终 JSON');
+      json.href = artifactUrl(attempt.finalResultPath, true);
+      json.download = '';
+      bar.append(json);
+      fragment.append(bar);
+    }
   }
   if (resultAvailable && detail.records.items.length) {
     fragment.append(el('p', 'evidence-note result-hint-note', '当前页面提示仅基于已保存结果，不计入原检查报告，也不改变业务状态。'));

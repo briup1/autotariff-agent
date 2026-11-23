@@ -11,7 +11,7 @@
 
 .result-table td.result-date-hint{min-width:180px;max-width:230px;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.8;color:#925b15}
 .result-date-hint strong{display:block;font-weight:600}
-.result-hint-note,.result-table th.result-hint-heading{color:var(--ink)}
+.result-hint-note,.result-workbook-note,.result-table th.result-hint-heading{color:var(--ink)}
 .result-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:0 0 16px}
 .result-actions .primary-button{min-height:36px;font-size:11px;padding:8px 13px}
 .artifact-content.sheet{white-space:normal;padding:16px 20px}
