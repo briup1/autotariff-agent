@@ -20,6 +20,8 @@ Start the local web server on a chosen port with `PORT=5101 scripts/run_with_tem
 
 结果页的「当前页面提示」仅基于当前已加载的已保存结果作只读观察，不改写原检查报告或业务状态。日期判定与定向测试见 `docs/visual-center-ui-notes.md`。
 
+选文件的说明状态、下一步引导、隔离合成示例与定向离线验证见 `docs/visual-center-ui-notes.md` 的“选文件状态与下一步引导”章节；选择、导入和创建会话均不调用模型。
+
 Run `factory/checks.sh` for the factory gate: dependency setup when absent, `npm run typecheck`, and `npm test`. Tests must not touch the delivered ledger. The full test suite may require a macOS environment that allows `sandbox-exec`.
 
 ## Software factory
