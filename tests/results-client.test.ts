@@ -5,6 +5,7 @@ import { expect, it, vi } from 'vitest';
 import { PROJECT_ROOT } from '../src/closure/paths.js';
 
 type RecordData = Record<string, unknown>;
+type AttemptData = { id: string; reportStatus: string; validationStatus: string; issueCount: number; xlsxStatus: string; xlsxPath?: string; finalResultPath?: string };
 
 // 提供渲染所需的最小 DOM，并记录真实按钮事件。
 class TestNode {
@@ -50,8 +51,8 @@ function record(start: unknown = '2026-11-03', end: unknown = '2026-08-30', sour
 // 构造原零问题、待复核报告及两个可切换轮次。
 function detail(items: RecordData[], offset = 0, attempt = 'a1') {
   return {
-    run: { runId: 'r1', decision: 'REVIEW', origin: 'history', active: false, issueCount: 0 },
-    attempts: ['a1', 'a2'].map(id => ({ id, reportStatus: 'available', validationStatus: 'REVIEW', issueCount: 0 })),
+    run: { runId: 'r1', label: '真实复用 · Excel', decision: 'REVIEW', origin: 'history', active: false, issueCount: 0 },
+    attempts: ['a1', 'a2'].map((id): AttemptData => ({ id, reportStatus: 'available', validationStatus: 'REVIEW', issueCount: 0, xlsxStatus: 'missing' })),
     selectedAttemptId: attempt,
     records: { status: 'available', items, offset, limit: 50, total: 51 },
     issues: [] as Array<{ message: string; code: string; stage: string; expected: unknown; actual: unknown; sourceIds: string[]; resultIds: string[] }>,
@@ -63,7 +64,8 @@ async function setup(initial = detail([record(), record('2026-11-03', '2026-08-0
   const code = await readFile(resolve(PROJECT_ROOT, 'web/app.js'), 'utf8');
   const nodes = new Map<string, TestNode>();
   const requests: string[] = [];
-  const state = { run: initial, runId: 'r1', offset: initial.records.offset, attemptId: initial.selectedAttemptId, runEpoch: 0, evidenceTab: 'results', runKey: '', runLoading: false };
+  const state = { run: initial, runId: initial.run.runId, offset: initial.records.offset, attemptId: initial.selectedAttemptId, runEpoch: 0, evidenceTab: 'results', runKey: '', runLoading: false };
+  const previews: unknown[] = [];
   // 默认返回正常日期记录，并沿用读取请求的分页偏移与轮次。
   let response = (url: URL) => detail([record('2026-08-01', '2026-08-30')], Number(url.searchParams.get('offset')), url.searchParams.get('attempt') || 'a1');
   // 获取固定页面节点，使重新渲染能够替换同一容器。
@@ -82,10 +84,12 @@ async function setup(initial = detail([record(), record('2026-11-03', '2026-08-0
     },
     syncSelect() {}, markConnected() {}, markDisconnected() {}, renderConversationHeader() {}, renderMessages() {}, updateLocation() {}, toast() {},
     renderActivity() {}, renderArtifacts() {},
+    // 捕获现有预览入口的调用参数，不执行或导出工作簿。
+    openArtifact: (artifact: unknown) => { previews.push(artifact); },
     // 仅允许真实加载代码的读取接口；任何写请求立即使测试失败。
     api: async (path: string, options?: unknown) => {
       expect(options).toBeUndefined();
-      expect(path).toMatch(/^\/api\/runs\/r1\?/);
+      expect(path).toMatch(/^\/api\/runs\/[\w-]+\?/);
       requests.push(path);
       return response(new URL(path, 'http://127.0.0.1'));
     },
@@ -94,13 +98,13 @@ async function setup(initial = detail([record(), record('2026-11-03', '2026-08-0
     code.slice(code.indexOf('const statuses ='), code.indexOf('const operations ='))
     + code.slice(code.indexOf('const iconPaths ='), code.indexOf('function bytes('))
     + code.slice(code.indexOf('function renderRunChrome('), code.indexOf('function renderActivity('))
-    + code.slice(code.indexOf('function isResultDate('), code.indexOf('function artifactUrl('))
+    + code.slice(code.indexOf('function isResultDate('), code.indexOf('function renderArtifacts('))
     + code.slice(code.indexOf('async function loadRun('), code.indexOf('function setEvidenceTab(')), context);
   // 调用真实证据渲染，包含运行状态、轮次状态和结果容器替换。
   const render = () => runInContext('renderEvidence()', context);
   render();
   return {
-    state, nodes, requests, context, render,
+    state, nodes, requests, previews, context, render,
     // 读取当前结果容器，便于断言重新渲染后的页面内容。
     root: () => getNode('evidence-content'),
     // 执行真实客户端入口，用于触发轮次切换等交互。
@@ -220,6 +224,103 @@ it.each([
   expect(text(h.root())).toContain('检查报告缺失、未登记或摘要校验失败，无法确认检查问题。');
 });
 
+// 从真实节点读取下载 URL，避免以源码字符串代替行为断言。
+function links(node: TestNode) {
+  return find(node, n => n.tagName === 'a').map(n => ({ label: n.textContent, url: new URL((n as TestNode & { href: string }).href, 'http://127.0.0.1') }));
+}
+
+it.each(['missing', 'error', 'available'])('renders workbook state %s independently of final JSON and report state', async xlsxStatus => {
+  const data = detail([record(), record('2026-11-03', '2026-08-07', 'Rates!R3C1')]);
+  Object.assign(data.attempts[0], { xlsxStatus, xlsxPath: xlsxStatus === 'available' ? 'saved/book.xlsx' : undefined, finalResultPath: 'saved/complete.json' });
+  const before = structuredClone(data);
+  const h = await setup(data);
+  expect(find(h.root(), n => n.tagName === 'tbody')[0].children).toHaveLength(2);
+  expect(text(h.root())).toContain('Rates!R2C1');
+  expect(text(h.root())).toContain('Rates!R3C1');
+  expect(text(h.root()).includes('本轮未生成结果工作簿')).toBe(xlsxStatus === 'missing');
+  expect(text(h.root()).includes('已登记但缺失或校验失败')).toBe(xlsxStatus === 'error');
+  const downloads = links(h.root());
+  expect(downloads.map(item => item.label)).toEqual([xlsxStatus === 'available' ? '下载结果 Excel' : '下载最终 JSON']);
+  expect(Object.fromEntries(downloads[0].url.searchParams)).toEqual({ runId: 'r1', path: xlsxStatus === 'available' ? 'saved/book.xlsx' : 'saved/complete.json', download: '1' });
+  const preview = find(h.root(), n => n.textContent === '预览 Excel');
+  expect(preview).toHaveLength(xlsxStatus === 'available' ? 1 : 0);
+  if (preview.length) {
+    preview[0].handlers.click();
+    expect(h.previews).toEqual([{ path: 'saved/book.xlsx', label: '第 1 轮结果 Excel', kind: 'result-xlsx', bytes: 0 }]);
+  }
+  h.render();
+  expect(h.state.run).toEqual(before);
+  data.attempts[0].reportStatus = 'error';
+  h.render();
+  expect(text(h.root())).toContain('报告不可用');
+  expect(links(h.root()).map(item => item.url.href)).toEqual(downloads.map(item => item.url.href));
+  expect(h.requests).toEqual([]);
+});
+
+it('keeps available Excel actions when final JSON is unavailable', async () => {
+  const data = detail([]);
+  data.records.status = 'error';
+  Object.assign(data.attempts[0], { xlsxStatus: 'available', xlsxPath: 'saved/book.xlsx' });
+  const h = await setup(data);
+  expect(links(h.root()).map(item => item.label)).toEqual(['下载结果 Excel']);
+  expect(find(h.root(), n => n.textContent === '预览 Excel')).toHaveLength(1);
+  expect(text(h.root())).not.toContain('本轮未生成');
+  expect(text(h.root())).not.toContain('已登记但缺失');
+  expect(text(h.root())).toContain('结果产物读取失败');
+});
+
+it.each(['missing', 'error'])('omits unavailable JSON actions with workbook state %s while preserving empty states', async xlsxStatus => {
+  for (const status of ['pending', 'error', 'available']) {
+    const data = detail([]);
+    data.attempts[0].xlsxStatus = xlsxStatus;
+    data.records = { status, items: [], offset: 0, limit: 50, total: 0 };
+    const h = await setup(data);
+    expect(links(h.root())).toEqual([]);
+    expect(text(h.root())).not.toContain('预览 Excel');
+    expect(text(h.root())).toContain(status === 'pending' ? '尚未产生后处理结果' : status === 'error' ? '结果产物读取失败' : '0 条结果记录');
+    if (status === 'available') {
+      data.attempts[0].finalResultPath = 'saved/empty.json';
+      h.render();
+      expect(links(h.root())[0].label).toBe('下载最终 JSON');
+    }
+  }
+});
+
+it('updates download links on real pagination, attempt selection, return and run switching', async () => {
+  const original = detail([record(), record('2026-11-03', '2026-08-07', 'Rates!R3C1')]);
+  original.attempts[0].finalResultPath = 'archive/reused.json';
+  Object.assign(original.attempts[1], { xlsxStatus: 'available', xlsxPath: 'archive/new.xlsx' });
+  const before = structuredClone(original);
+  const h = await setup(original);
+  h.respond(url => {
+    const attempt = url.searchParams.get('attempt') || 'a1';
+    const offset = Number(url.searchParams.get('offset'));
+    const next = structuredClone(original);
+    next.selectedAttemptId = attempt;
+    next.records.offset = offset;
+    if (offset || attempt === 'a2') next.records.items = [record('2026-08-01', '2026-08-30', 'Other!R1C1')];
+    if (url.pathname.endsWith('/r2')) { next.run.runId = 'r2'; next.attempts[0].finalResultPath = 'another/result.json'; }
+    return next;
+  });
+  find(h.root(), n => n.textContent === '下一页')[0].handlers.click();
+  await vi.waitFor(() => expect(h.state.run.records.offset).toBe(50));
+  expect(links(h.root())[0].url.searchParams.get('path')).toBe('archive/reused.json');
+  h.call("selectAttempt('a2')");
+  await vi.waitFor(() => expect(h.state.run.selectedAttemptId).toBe('a2'));
+  expect(links(h.root()).map(item => item.label)).toEqual(['下载结果 Excel']);
+  expect(links(h.root())[0].url.searchParams.get('path')).toBe('archive/new.xlsx');
+  expect(text(h.root())).not.toContain('本轮未生成');
+  expect(text(h.root())).not.toContain('Rates!R2C1');
+  h.call("selectAttempt('a1')");
+  await vi.waitFor(() => expect(h.state.run.selectedAttemptId).toBe('a1'));
+  expect(links(h.root())[0].url.searchParams.get('path')).toBe('archive/reused.json');
+  expect(text(h.root())).toContain('Rates!R2C1');
+  await h.call("loadRun('r2')");
+  expect(Object.fromEntries(links(h.root())[0].url.searchParams)).toEqual({ runId: 'r2', path: 'another/result.json', download: '1' });
+  expect(original).toEqual(before);
+  expect(h.requests).toHaveLength(4);
+});
+
 it('does not render stale records when results are unavailable or no attempt exists', async () => {
   const data = detail([record()]);
   data.records.status = 'error';
@@ -230,4 +331,6 @@ it('does not render stale records when results are unavailable or no attempt exi
   h.render();
   expect(text(h.root())).toContain('尚未产生抽取轮次');
   expect(text(h.root())).not.toContain('运价有效期倒置');
+  expect(text(h.root())).not.toContain('本轮未生成结果工作簿');
+  expect(links(h.root())).toEqual([]);
 });

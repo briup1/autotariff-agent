@@ -79,7 +79,9 @@ export type AttemptView = {
   validationStatus?: string;
   reportStatus: "available" | "pending" | "error";
   recordCount?: number;
+  xlsxStatus: "missing" | "available" | "error";
   xlsxPath?: string;
+  finalResultPath?: string;
 };
 
 export type ArtifactView = {
