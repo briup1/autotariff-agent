@@ -603,7 +603,7 @@ function renderResults() {
     fragment.append(bar);
   }
   if (resultAvailable && detail.records.items.length) {
-    fragment.append(el('p', 'evidence-note', '当前页面提示仅基于已保存结果，不计入原检查报告，也不改变业务状态。'));
+    fragment.append(el('p', 'evidence-note result-hint-note', '当前页面提示仅基于已保存结果，不计入原检查报告，也不改变业务状态。'));
     const tableScroll = el('div', 'table-scroll');
     tableScroll.tabIndex = 0;
     tableScroll.setAttribute('aria-label', '结果表格，可横向滚动查看所有字段');
@@ -612,7 +612,7 @@ function renderResults() {
     const head = el('thead');
     const header = el('tr');
     header.append(el('th', '', '#'));
-    const hintHeader = el('th', '', '当前页面提示');
+    const hintHeader = el('th', 'result-hint-heading', '当前页面提示');
     hintHeader.scope = 'col';
     header.append(hintHeader);
     for (const key of keys) { const th = el('th', '', key); th.scope = 'col'; header.append(th); }
