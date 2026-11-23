@@ -44,6 +44,7 @@
         </section>
         <aside class="evidence-panel" aria-label="执行过程与结果证据">
           <header class="evidence-heading"><div><span class="evidence-heading-dot" aria-hidden="true"></span><h2>工作证据</h2></div><span class="read-only-label" id="origin-label">等待运行</span></header>
+          <div class="history-result-context" id="history-result-context" hidden><div><strong>历史结果 · 只读核价</strong><span id="history-result-source"></span></div><button class="quiet-button" id="history-result-new">新建会话</button></div>
           <div class="run-context"><label for="run-select">运行记录</label><select id="run-select" disabled><option value="">尚未产生运行</option></select><div class="run-id-row"><code id="run-id">发送要求后生成运行 ID</code><button class="icon-button small-icon" id="copy-run" aria-label="复制运行 ID" title="复制运行 ID" disabled><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 9h11v12H9zM5 15H3V3h12v2"/></svg></button></div><div class="run-status-row" id="run-status-row" hidden></div></div>
           <nav class="evidence-tabs" aria-label="证据类别"><button class="active" data-evidence-tab="activity" aria-pressed="true">执行过程</button><button data-evidence-tab="results" aria-pressed="false">结果</button><button data-evidence-tab="artifacts" aria-pressed="false">产物</button><button data-evidence-tab="tests" aria-pressed="false">工程测试</button></nav>
           <div class="attempt-toolbar" id="attempt-toolbar" hidden><label for="attempt-select">查看轮次</label><select id="attempt-select"></select><span id="attempt-status"></span></div>

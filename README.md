@@ -22,6 +22,8 @@ scripts/run_with_temp_runtime.sh npm run web
 
 产品验收范围见 `docs/visual-center-product.md`，接入设计见 `docs/visual-center-design.md`。
 
+历史记录的「结果」标签采用只读核价布局：证据区使用聊天空态空间，优先显示已有航线、箱型卖价和有效期；来源标识与其他列仍在同一行局部横移查看。仅重排页面显示，不推断有效期、不改记录、Excel 预览列序或下载文件；工作会话及其他标签保持原布局。仅供合成 UI 验证的复现入口为 `PORT=5130 scripts/run_with_temp_runtime.sh node scripts/history-result-review.mjs`，打开 `http://127.0.0.1:5130` 后从「历史运行」选择「合成 UI · 两行核价」。该服务只提供 GET，不加载模型或交付账本；步骤、截图及验证边界见 `docs/evidence/history-result-review/README.md`。
+
 ```text
 原文件与要求 → 原文全量盘点与分页 → Pi 选路/生成或复制编辑
 → macOS 沙箱执行或直接模型抽取 → 版本化字段后处理

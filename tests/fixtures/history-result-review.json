@@ -1,0 +1,29 @@
+[
+  {
+    "recordId": "quote-A",
+    "sourceId": "报价!R2C1",
+    "origin": "SHANGHAI",
+    "destination": "SINGAPORE",
+    "20GP卖价": 120,
+    "40GP卖价": 230,
+    "40HQ卖价": 245,
+    "运价有效开始时间": "2026-11-01",
+    "运价有效结束时间": "2026-11-15",
+    "ETD": "2026-11-03",
+    "运价备注": "合成备注 A"
+  },
+  {
+    "recordId": "quote-B",
+    "sourceId": "报价!R8C1",
+    "origin": "NINGBO",
+    "destination": "BUSAN",
+    "20GP卖价": 210,
+    "40GP卖价": 340,
+    "40HQ卖价": 365,
+    "运价有效开始时间": "2026-12-01",
+    "运价有效结束时间": "2026-12-20",
+    "ETD": "2026-12-05",
+    "运价备注": "合成备注 B",
+    "自定义字段": "仅记录 B 提供的合成字段；长值核验 abcdefghijklmnopqrstuvwxyz 0123456789"
+  }
+]

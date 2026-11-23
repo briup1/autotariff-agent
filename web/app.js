@@ -429,7 +429,23 @@ function panelEmpty(title, message) {
   empty.append(icon('evidence'), el('h3', '', title), el('p', '', message));
   return empty;
 }
+// 仅历史结果页让出聊天空态空间，离开标签或选择会话时同步撤销。
+function historyResultsMode() {
+  return !state.selection && state.run?.run.origin === 'history' && state.evidenceTab === 'results';
+}
+// 把只读来源身份留在结果区，隐藏聊天区域也退出键盘焦点序列。
+function renderHistoryResultsLayout() {
+  const active = historyResultsMode();
+  $('workspace').classList.toggle('history-results', active);
+  document.querySelector('.chat-panel').inert = active && !matchMedia('(max-width:767px)').matches;
+  $('history-result-context').hidden = !active;
+  $('history-result-source').textContent = active ? state.run.run.sourceName : '';
+  $('history-result-source').title = $('history-result-source').textContent;
+  document.querySelector('.skip-link').href = active ? '#refresh-run' : '#message-input';
+}
+// 更新证据内容前同步布局，避免渲染缓存保留上一页的模式。
 function renderEvidence() {
+  renderHistoryResultsLayout();
   renderRunChrome();
   const content = $('evidence-content');
   const renderKey = JSON.stringify([state.evidenceTab, state.run, state.runLoading && !state.run, state.evidenceTab === 'tests' ? state.bootstrap?.tests : null]);
@@ -554,6 +570,14 @@ function renderActivity() {
   fragment.append(usage);
   return fragment;
 }
+// 仅重排当前页已有的业务列，其余列沿用首次出现顺序，不改动记录。
+function resultKeys(items) {
+  const keys = [...new Set(items.flatMap((row) => Object.keys(row)))];
+  if (!historyResultsMode()) return keys;
+  const priority = ['origin', 'destination', '20GP卖价', '40GP卖价', '40HQ卖价', '运价有效开始时间', '运价有效结束时间'];
+  return [...priority.filter((key) => keys.includes(key)), ...keys.filter((key) => !priority.includes(key))];
+}
+// 用同一份分页记录呈现结果与检查问题，历史模式只调整显示列序。
 function renderResults() {
   const detail = state.run;
   const fragment = document.createDocumentFragment();
@@ -587,7 +611,7 @@ function renderResults() {
     tableScroll.tabIndex = 0;
     tableScroll.setAttribute('aria-label', '结果表格，可横向滚动查看所有字段');
     const table = el('table', 'result-table');
-    const keys = [...new Set(detail.records.items.flatMap((row) => Object.keys(row)))];
+    const keys = resultKeys(detail.records.items);
     const head = el('thead');
     const header = el('tr');
     header.append(el('th', '', '#'));
@@ -823,8 +847,10 @@ function setEvidenceTab(tab) {
   $('evidence-scroll').scrollTop = 0;
   renderEvidence();
 }
+// 保持窄屏导航约定，切回对话时恢复可访问的聊天入口。
 function setMobileTab(tab) {
   state.mobileTab = tab;
+  renderHistoryResultsLayout();
   $('workspace').dataset.mobileView = tab;
   document.querySelectorAll('[data-mobile-tab]').forEach((button) => {
     const active = button.dataset.mobileTab === tab;
@@ -1689,6 +1715,7 @@ async function poll() {
 }
 
 $('new-conversation').addEventListener('click', openSourceDialog);
+$('history-result-new').addEventListener('click', openSourceDialog);
 $('open-plan-library').addEventListener('click', openPlanLibrary);
 $('close-plan-library').addEventListener('click', closePlanLibrary);
 $('retry-plan-library').addEventListener('click', loadPlanLibrary);
