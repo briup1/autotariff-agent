@@ -60,4 +60,50 @@ bash /Users/ziyun/workdir/remote_project/autotariff-agent/factory/checks.sh
 | 桌面模式撤销 | PASS。从历史结果切执行过程时 history-results=false、chat=flex；产物和工程测试可读，再返回结果。选择已有工作会话时表头为 #、recordId、sourceId、origin，输入框可见；进入新建会话仅打开既有选择原文件对话框，不提交创建。 | `work-session.png`、`new-session.png` |
 | 只读边界 | PASS。请求日志全部 GET，包括刷新、来源方案读取、预览下载；无消息 POST、模型请求或启动抽取。服务不导入后端模块。git 变更不包含 template_runs、投影、后处理、导出、factory/checks.sh 或 factory/config.json。 | `requests.json`、代码差异 |
 
-操作中曾因未滚到可见按钮而出现 agent-browser 等待超时；滚到可见区域后重新实际点击成功，非应用回归，未将失败步骤算作通过。无未解决验收项。核验结束关闭隔离浏览器并仅停止 5130 监听进程。
+操作中曾因未滚到可见按钮而出现 agent-browser 等待超时；滚到可见区域后重新实际点击成功，非应用回归，未将失败步骤算作通过。第 1 轮审查另发现键盘跳转、跨断点 inert 和表头对比度问题，修正核验见下文。核验结束关闭隔离浏览器并仅停止 5130 监听进程。
+
+## 第 2 轮：键盘路径与表头对比度
+
+依据第 1 轮代码及 UI 审查逐项修正；仍使用同一只读合成服务、5130 端口和 `003-issue-builder` 浏览器会话，不调用模型或提交消息。
+
+- 跳转入口根据当前可见区域同步文字与目标：对话为「跳到消息输入」→ `#message-input`，证据为「跳到证据刷新」→ `#refresh-run`。
+- 新增 767px 媒体查询变化监听，即使未触发重新渲染也同步聊天 `inert` 与跳转入口；隐藏聊天不能聚焦，可见聊天恢复访问。
+- 仅历史结果表头复用既有单元格深色 `#4e6888`，背景保持 `#eef3f9`；WCAG 相对亮度公式计算为 **5.1436:1**，高于 12px 小字要求的 4.5:1。工作会话和 Excel 预览表头实测仍为 `rgb(104,128,158)`，未被本次样式改变。
+- 合成服务的 `createServer` 回调旁补充简体中文注释，明确异步路由失败转换为 HTTP 500 的职责。
+- 证据边界澄清：`new-session.png` **仅证明既有文件选择对话框能打开，未执行创建，不证明创建后的空会话状态**；本轮也未进行创建或消息提交。原有行为测试覆盖空状态模式撤销，不冒充真实页面创建证据。
+
+实际复测命令主干（每条均带隔离会话参数）：
+
+```bash
+agent-browser --session 003-issue-builder set viewport 390 844
+agent-browser --session 003-issue-builder open 'http://127.0.0.1:5130/?run=synthetic-history'
+agent-browser --session 003-issue-builder focus '.skip-link'
+agent-browser --session 003-issue-builder press Enter
+agent-browser --session 003-issue-builder click '[data-mobile-tab="chat"]'
+agent-browser --session 003-issue-builder focus '.skip-link'
+agent-browser --session 003-issue-builder press Enter
+agent-browser --session 003-issue-builder click '[data-mobile-tab="results"]'
+agent-browser --session 003-issue-builder focus '.skip-link'
+agent-browser --session 003-issue-builder press Enter
+agent-browser --session 003-issue-builder click '[data-mobile-tab="chat"]'
+agent-browser --session 003-issue-builder set viewport 1600 760
+agent-browser --session 003-issue-builder click '[data-evidence-tab="activity"]'
+agent-browser --session 003-issue-builder click '[data-evidence-tab="results"]'
+agent-browser --session 003-issue-builder set viewport 390 844
+agent-browser --session 003-issue-builder focus '#messages-scroll'
+agent-browser --session 003-issue-builder focus '.skip-link'
+agent-browser --session 003-issue-builder press Enter
+```
+
+真实浏览器结论全部 PASS：
+
+| 场景 | 实测结果 | 证据 |
+| --- | --- | --- |
+| 手机结果→对话→结果 | 三次激活跳转分别聚焦 `refresh-run`／`message-input`／`refresh-run`，文字和可见目标一致。结果时聊天 inert=true，对话时 false。 | `round-2-measurements.json`、`round-2-mobile-chat-focus.png` |
+| 390→1600，执行过程→结果 | 桌面历史结果聊天 display=none、inert=true；尝试聚焦消息记录无效，焦点保留在可见的刷新按钮。跳转文字「跳到证据刷新」正确。 | `round-2-desktop-skip.png`、读数 JSON |
+| 再缩回390 | 不点击任何标签即可恢复聊天 display=flex、inert=false，消息记录能聚焦；再激活跳转聚焦 `message-input`，根 scrollWidth=390。 | `round-2-breakpoint-chat.png`、读数 JSON |
+| 767→768→767 | 各断点使用 `wait --fn` 实测聊天 inert 为 false→true→false，无需其他重绘动作。 | 命令实际成功输出 `true` |
+| 桌面核价保持 | 1600×760、scale=1、表格宽1310，核心列仍 x=282.53–971.89，两行仍 y=607.30–694.80；仅表头文字变深。 | `round-2-desktop.png`、读数 JSON |
+| 样式与请求隔离 | Excel 原列序与工作会话原表头色不变；本轮记录10条请求全部 GET。 | `round-2-requests.json` |
+
+新增前端回归用例覆盖手机视图往返、跨断点状态和监听注册；最终定向回归25项通过，完整门禁类型检查通过、28文件238项测试通过，`git diff --check` 通过。浏览器已关闭且仅停止5130监听进程。

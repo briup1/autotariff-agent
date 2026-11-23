@@ -437,11 +437,15 @@ function historyResultsMode() {
 function renderHistoryResultsLayout() {
   const active = historyResultsMode();
   $('workspace').classList.toggle('history-results', active);
-  document.querySelector('.chat-panel').inert = active && !matchMedia('(max-width:767px)').matches;
+  const narrow = matchMedia('(max-width:767px)').matches;
+  const chatVisible = narrow ? state.mobileTab === 'chat' : !active;
+  document.querySelector('.chat-panel').inert = !chatVisible;
   $('history-result-context').hidden = !active;
   $('history-result-source').textContent = active ? state.run.run.sourceName : '';
   $('history-result-source').title = $('history-result-source').textContent;
-  document.querySelector('.skip-link').href = active ? '#refresh-run' : '#message-input';
+  const skip = document.querySelector('.skip-link');
+  skip.href = chatVisible ? '#message-input' : '#refresh-run';
+  skip.textContent = chatVisible ? '跳到消息输入' : '跳到证据刷新';
 }
 // 更新证据内容前同步布局，避免渲染缓存保留上一页的模式。
 function renderEvidence() {
@@ -1797,9 +1801,11 @@ document.addEventListener('keydown', (event) => {
 window.addEventListener('online', reconnect);
 window.addEventListener('offline', () => markDisconnected({ network: true }));
 
+// 初始化既有选择，并在布局断点变化时同步可见区域的键盘入口。
 async function init() {
   closeSidebar();
   matchMedia('(max-width:1199px)').addEventListener('change', closeSidebar);
+  matchMedia('(max-width:767px)').addEventListener('change', renderHistoryResultsLayout);
   try {
     await loadBootstrap();
     const query = new URLSearchParams(location.search);

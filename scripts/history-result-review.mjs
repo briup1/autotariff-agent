@@ -56,5 +56,6 @@ async function respond(req, res) {
   } else { res.writeHead(404); res.end('合成核验未提供此资源'); return; }
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(body));
 }
+// 将异步路由失败转换为 HTTP 500，避免请求悬空或未处理的拒绝。
 const server = createServer((req, res) => { respond(req, res).catch((error) => { res.writeHead(500); res.end(String(error)); }); });
 server.listen(Number(process.env.PORT || 5130), '127.0.0.1', () => { console.log(`仅供合成 UI 验证 http://127.0.0.1:${server.address().port}\n临时文件 ${temp}\nExcel SHA-256 ${sha256}`); });

@@ -57,10 +57,12 @@ async function resultClient(items?: Record<string, unknown>[]) {
   const records = items || JSON.parse(await readFile(resolve(PROJECT_ROOT, "tests/fixtures/history-result-review.json"), "utf8"));
   const state: any = { selection: null, evidenceTab: "results", run: { run: { origin: "history", sourceName: "合成 UI" }, attempts: [{ id: "a2", reportStatus: "available" }], selectedAttemptId: "a2", records: { status: "available", items: records, offset: 0, limit: 2, total: 2 }, issues: [] } };
   const nodes = new Map<string, any>();
-  const get = (id: string) => { if (!nodes.has(id)) nodes.set(id, { classList: { toggle(_name: string, active: boolean) { nodes.get(id).active = active; } } }); return nodes.get(id); };
-  const context = createContext({ state, $: get, matchMedia: () => ({ matches: false }), document: { querySelector: get, createDocumentFragment: () => resultNode() }, el: resultNode, runCallout: () => null, number: String, badge: () => resultNode(), sectionTitle: () => resultNode() });
+  const get = (id: string) => { if (!nodes.has(id)) nodes.set(id, { dataset: {}, classList: { toggle(_name: string, active: boolean) { nodes.get(id).active = active; } } }); return nodes.get(id); };
+  const viewport = { narrow: false };
+  const context = createContext({ state, $: get, matchMedia: () => ({ matches: viewport.narrow }), document: { querySelector: get, querySelectorAll: () => [], createDocumentFragment: () => resultNode() }, el: resultNode, runCallout: () => null, number: String, badge: () => resultNode(), sectionTitle: () => resultNode(), setEvidenceTab: (tab: string) => { state.evidenceTab = tab; } });
   runInContext(source.slice(source.indexOf("function valueText("), source.indexOf("function cellText(")) + source.slice(source.indexOf("function historyResultsMode("), source.indexOf("// 更新证据内容")) + source.slice(source.indexOf("function resultKeys("), source.indexOf("function artifactUrl(")), context);
-  return { state, nodes, render: () => runInContext("renderResults()", context), layout: () => runInContext("renderHistoryResultsLayout()", context) };
+  runInContext(source.slice(source.indexOf("function setMobileTab("), source.indexOf("function closeSidebar(")), context);
+  return { state, nodes, viewport, render: () => runInContext("renderResults()", context), layout: () => runInContext("renderHistoryResultsLayout()", context), mobile: (tab: string) => runInContext(`setMobileTab(${JSON.stringify(tab)})`, context) };
 }
 
 it("prioritizes existing history pricing fields without dropping optional keys or mutating records", async () => {
@@ -108,4 +110,30 @@ it("enters and exits history mode on evidence and conversation changes without l
   client.state.run = null; client.layout();
   expect(client.nodes.get("workspace").active).toBe(false);
   expect(client.nodes.get(".skip-link").href).toBe("#message-input");
+});
+
+it("keeps skip-link labels and chat accessibility in sync across mobile views and the 767px breakpoint", async () => {
+  const client = await resultClient();
+  client.viewport.narrow = true;
+  client.mobile("results");
+  expect(client.nodes.get(".skip-link")).toMatchObject({ href: "#refresh-run", textContent: "跳到证据刷新" });
+  expect(client.nodes.get(".chat-panel").inert).toBe(true);
+  client.mobile("chat");
+  expect(client.nodes.get(".skip-link")).toMatchObject({ href: "#message-input", textContent: "跳到消息输入" });
+  expect(client.nodes.get(".chat-panel").inert).toBe(false);
+  client.mobile("results");
+  expect(client.nodes.get(".skip-link").href).toBe("#refresh-run");
+  client.mobile("chat");
+  client.viewport.narrow = false; client.layout();
+  expect(client.nodes.get(".chat-panel").inert).toBe(true);
+  expect(client.nodes.get(".skip-link")).toMatchObject({ href: "#refresh-run", textContent: "跳到证据刷新" });
+  client.state.evidenceTab = "activity"; client.layout();
+  expect(client.nodes.get(".chat-panel").inert).toBe(false);
+  client.state.evidenceTab = "results"; client.layout();
+  expect(client.nodes.get(".chat-panel").inert).toBe(true);
+  client.viewport.narrow = true; client.layout();
+  expect(client.nodes.get(".chat-panel").inert).toBe(false);
+  expect(client.nodes.get(".skip-link")).toMatchObject({ href: "#message-input", textContent: "跳到消息输入" });
+  const source = await readFile(resolve(PROJECT_ROOT, "web/app.js"), "utf8");
+  expect(source).toContain("matchMedia('(max-width:767px)').addEventListener('change', renderHistoryResultsLayout)");
 });
