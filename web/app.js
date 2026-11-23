@@ -554,6 +554,26 @@ function renderActivity() {
   fragment.append(usage);
   return fragment;
 }
+// 严格校验四位年份的公历日期，不使用会自动纠错或受时区影响的日期解析。
+function isResultDate(value) {
+  if (typeof value !== 'string' || value.length !== 10 || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  if (year < 1 || month < 1 || month > 12 || day < 1) return false;
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day <= days[month - 1];
+}
+// 仅为当前已加载记录生成只读提示，不修改结果字段或原检查报告。
+function resultDateHint(record) {
+  const cell = el('td', 'result-date-hint');
+  const start = record['运价有效开始时间'];
+  const end = record['运价有效结束时间'];
+  if (isResultDate(start) && isResultDate(end) && end < start) {
+    cell.append(el('strong', '', '运价有效期倒置'), el('div', '', `开始日：${start}`), el('div', '', `结束日：${end}`), el('div', '', '请回查原文'));
+  }
+  return cell;
+}
+// 保留原结果与报告的呈现，并在独立列展示当前页面的日期观察。
 function renderResults() {
   const detail = state.run;
   const fragment = document.createDocumentFragment();
@@ -582,7 +602,8 @@ function renderResults() {
     bar.append(xlsx, preview);
     fragment.append(bar);
   }
-  if (detail.records.items.length) {
+  if (resultAvailable && detail.records.items.length) {
+    fragment.append(el('p', 'evidence-note result-hint-note', '当前页面提示仅基于已保存结果，不计入原检查报告，也不改变业务状态。'));
     const tableScroll = el('div', 'table-scroll');
     tableScroll.tabIndex = 0;
     tableScroll.setAttribute('aria-label', '结果表格，可横向滚动查看所有字段');
@@ -591,12 +612,15 @@ function renderResults() {
     const head = el('thead');
     const header = el('tr');
     header.append(el('th', '', '#'));
+    const hintHeader = el('th', 'result-hint-heading', '当前页面提示');
+    hintHeader.scope = 'col';
+    header.append(hintHeader);
     for (const key of keys) { const th = el('th', '', key); th.scope = 'col'; header.append(th); }
     head.append(header);
     const body = el('tbody');
     detail.records.items.forEach((record, index) => {
       const row = el('tr');
-      row.append(el('td', '', detail.records.offset + index + 1));
+      row.append(el('td', '', detail.records.offset + index + 1), resultDateHint(record));
       for (const key of keys) { const value = valueText(record[key]); const cell = el('td', '', value); cell.title = value; row.append(cell); }
       body.append(row);
     });
