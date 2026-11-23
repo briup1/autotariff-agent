@@ -54,7 +54,7 @@ function detail(items: RecordData[], offset = 0, attempt = 'a1') {
     attempts: ['a1', 'a2'].map(id => ({ id, reportStatus: 'available', validationStatus: 'REVIEW', issueCount: 0 })),
     selectedAttemptId: attempt,
     records: { status: 'available', items, offset, limit: 50, total: 51 },
-    issues: [],
+    issues: [] as Array<{ message: string; code: string; stage: string; expected: unknown; actual: unknown; sourceIds: string[]; resultIds: string[] }>,
   };
 }
 
@@ -64,6 +64,7 @@ async function setup(initial = detail([record(), record('2026-11-03', '2026-08-0
   const nodes = new Map<string, TestNode>();
   const requests: string[] = [];
   const state = { run: initial, runId: 'r1', offset: initial.records.offset, attemptId: initial.selectedAttemptId, runEpoch: 0, evidenceTab: 'results', runKey: '', runLoading: false };
+  // 默认返回正常日期记录，并沿用读取请求的分页偏移与轮次。
   let response = (url: URL) => detail([record('2026-08-01', '2026-08-30')], Number(url.searchParams.get('offset')), url.searchParams.get('attempt') || 'a1');
   // 获取固定页面节点，使重新渲染能够替换同一容器。
   const getNode = (id: string) => {
@@ -98,7 +99,15 @@ async function setup(initial = detail([record(), record('2026-11-03', '2026-08-0
   // 调用真实证据渲染，包含运行状态、轮次状态和结果容器替换。
   const render = () => runInContext('renderEvidence()', context);
   render();
-  return { state, nodes, requests, context, render, root: () => getNode('evidence-content'), call: (source: string) => runInContext(source, context), respond: (next: typeof response) => { response = next; } };
+  return {
+    state, nodes, requests, context, render,
+    // 读取当前结果容器，便于断言重新渲染后的页面内容。
+    root: () => getNode('evidence-content'),
+    // 执行真实客户端入口，用于触发轮次切换等交互。
+    call: (source: string) => runInContext(source, context),
+    // 替换只读响应桩，使各页与各轮返回可区分的数据。
+    respond: (next: typeof response) => { response = next; },
+  };
 }
 
 it('locates both known inverted rows while keeping the original zero-finding report and REVIEW states unchanged', async () => {
@@ -154,10 +163,17 @@ it.each([
 it('replaces hints on actual pagination and attempt selection, and restores them when returning', async () => {
   const original = detail([record(), record('2026-11-03', '2026-08-07', 'Rates!R3C1')]);
   const h = await setup(original);
+  // 为第二轮提供独立问题卡片，确保记录和原报告一起切换。
   h.respond(url => {
     const offset = Number(url.searchParams.get('offset'));
     const attempt = url.searchParams.get('attempt') || 'a1';
-    return attempt === 'a1' && offset === 0 ? structuredClone(original) : detail([record('2026-08-07', '2026-08-07', 'Other!R1C1')], offset, attempt);
+    if (attempt === 'a1' && offset === 0) return structuredClone(original);
+    const next = detail([record('2026-08-07', '2026-08-07', 'Other!R1C1')], offset, attempt);
+    if (attempt === 'a2') {
+      next.attempts[1].issueCount = 1;
+      next.issues = [{ message: '第二轮原报告：请核对币种', code: 'CURRENCY', stage: 'validation', expected: 'USD', actual: 'CNY', sourceIds: ['Other!R1C1'], resultIds: ['r2'] }];
+    }
+    return next;
   });
   find(h.root(), n => n.tagName === 'button' && n.textContent === '下一页')[0].handlers.click();
   await vi.waitFor(() => expect(h.state.run.records.offset).toBe(50));
@@ -171,22 +187,30 @@ it('replaces hints on actual pagination and attempt selection, and restores them
   await vi.waitFor(() => expect(h.state.run.selectedAttemptId).toBe('a2'));
   expect(text(h.root())).not.toContain('运价有效期倒置');
   expect(text(h.root())).toContain('Other!R1C1');
-  expect(text(h.root())).toContain('检查问题 0 项');
+  expect(text(h.root())).toContain('检查问题 1 项');
+  expect(text(h.root())).toContain('第二轮原报告：请核对币种');
+  expect(text(h.root())).toContain('CURRENCY · validation');
+  expect(text(h.root())).not.toContain('这一轮报告中没有检查问题。');
+  expect(h.state.run.attempts[1].issueCount).toBe(1);
   h.call("selectAttempt('a1')");
   await vi.waitFor(() => expect(h.state.run.selectedAttemptId).toBe('a1'));
   expect(find(h.root(), n => n.tagName === 'strong' && n.textContent === '运价有效期倒置')).toHaveLength(2);
+  expect(text(h.root())).toContain('检查问题 0 项');
+  expect(text(h.root())).toContain('这一轮报告中没有检查问题。');
+  expect(text(h.root())).not.toContain('第二轮原报告：请核对币种');
   expect(h.state.run).toEqual(original);
   expect(h.requests.map(path => new URL(path, 'http://127.0.0.1').searchParams.get('attempt'))).toEqual(['a1', 'a1', 'a2', 'a1']);
 });
 
 it.each([
   ['available', '这一轮已保存的结果为零条记录。'],
-  ['missing', '这一轮尚未产生后处理结果。'],
+  ['pending', '这一轮尚未产生后处理结果。'],
   ['error', '结果产物读取失败或摘要校验失败，无法确认记录数。'],
 ])('preserves the %s result state and original report availability', async (status, message) => {
   const data = detail([]);
-  data.records.status = status;
+  data.records = { status, items: [], total: 0, offset: 0, limit: 50 };
   const h = await setup(data);
+  expect(text(find(h.root(), n => n.className === 'result-summary')[0])).toContain(status === 'available' ? '0 条结果记录' : status === 'pending' ? '未产生 结果记录' : '读取失败 结果记录');
   expect(text(h.root())).toContain(message);
   expect(text(h.root())).not.toContain('运价有效期倒置');
   expect(text(h.root())).toContain('检查问题 0 项');
