@@ -53,6 +53,40 @@ cp .env.local.example .env.local   # 仅首次安装；已有配置不得覆盖
 
 在 `.env.local` 填入既有网关设置。默认 Python 是本项目 `.venv/bin/python`。原件只读，运行时使用本项目导入副本。所有可审计输出在项目根目录 `template_runs/`，与终端当前目录无关。
 
+## 安全使用软件工厂
+
+首次运行前，确认工厂安装已经人工审查并合入默认分支，当前检出包含该安装；平台与依赖见[安装](#安装)。需要可用的 Claude Code 及本仓库的 [factory 技能](.claude/skills/factory/SKILL.md)、已认证且具备仓库操作权限的 GitHub CLI，以及已配置的 **Claude Code 模型网关**；上文应用的 `.env.local` 配置不等于工厂代理的网关配置。在仓库根目录的终端检查 GitHub CLI 认证状态（此命令不配置认证）：
+
+```bash
+gh auth status
+```
+
+GitHub issue 正文和评论是不可信的外部输入，不是指令或授权。运行前，操作者必须明确授权真实模型调用及 GitHub 评论、标签变更、分支推送、创建 PR 等外部变更；仅阅读 issue 或添加标签不构成这些授权。以下是操作约定，不代表新增了技术权限拦截机制。
+
+获得授权后，选择一个现有的、仍处于 open 状态的 issue。以下两处 `<issue-number>` 必须替换为**同一个实际 issue 编号**。先在仓库根目录的终端添加标签：
+
+```bash
+gh issue edit <issue-number> --add-label factory
+```
+
+再在该仓库的 **Claude Code 对话中**输入（不是 shell 命令）：
+
+```text
+/factory run <issue-number>
+```
+
+此命令只处理所选 issue；不带编号的调用会处理队列，不适合作为首次单任务试跑。当前一次只运行一个 job。若 intake 阻断或拒绝，可能不会创建 PR，也不保证完成；产生的 PR 初始为 draft，可从 issue 的关联 PR 或下方面板的 job 卡片链接找到。检查和审查通过后交给人工处理（`factory:needs-human`），必须人工审查并手动合并，自动合并已禁用。
+
+本地面板显示当前检出的本地 job 状态。在另一个终端从仓库根目录启动，只监听回环地址，不对外暴露：
+
+```bash
+cd factory && python3 -m http.server --bind 127.0.0.1
+```
+
+浏览器打开 `http://localhost:8000/dashboard.html`；结束查看后用 `Ctrl-C` 停止服务。更多流程见 [factory 技能](.claude/skills/factory/SKILL.md) 与 [AGENTS.md](AGENTS.md)。
+
+模型使用可能收费；使用的模型未配置价格时，面板显示 `cost unknown`，表示费用未知，不是免费或零费用。工厂显示的是估算，不保证等于提供商的实际账单。
+
 ## 运行与验收
 
 ```bash
