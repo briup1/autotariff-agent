@@ -48,11 +48,12 @@ export class WorkbenchService {
     this.store.recover();
   }
   configured(): boolean { return this.options.modelConfigured?.() ?? !!(process.env.OPENAI_API_KEY && process.env.PI_MODEL_ID); }
+  // 登记内置合成示例，保留来源及规则身份。
   async initialize(): Promise<void> {
     if (this.options.sources) for (const source of this.options.sources) this.store.putSource(source);
     else {
       const candidates = [
-        { id: "sample-controlled", label: "受控试点 · Excel", sourcePath: resolve(runsRootFor(this.root), "live-fixtures/small.xlsx"), requirementsPath: resolve(this.root, "fixtures/controlled-requirements.txt"), templateName: "controlled" },
+        { id: "sample-controlled", label: "海运运价表示例", sourcePath: resolve(runsRootFor(this.root), "live-fixtures/small.xlsx"), requirementsPath: resolve(this.root, "fixtures/controlled-requirements.txt"), templateName: "controlled" },
         { id: "sample-yishengchang", label: "怡升昌 · 上海宁波深圳运价表", sourcePath: resolve(this.root, "../autotariffextract/data/20260811-识别文件/怡升昌/上海宁波深圳运价表.xlsx"), requirementsPath: resolve(this.root, "../autotariffextract/data/20260811-识别文件/怡升昌/怡升昌说明.txt"), templateName: "FREIGHT_YISHENGCHANG_EXCEL_01" },
       ];
       for (const candidate of candidates) {
@@ -108,7 +109,7 @@ export class WorkbenchService {
     if (!shape.applicable) throw new PlanError(422,"PLAN_SOURCE_INVALID","原文件不能识别新契约要求的结构，请先核对契约。");
     return this.plans.appendVersion(planId,input,shape);
   }
-  /** Contract state is read from the registry, so a later approval shows up without re-uploading. */
+  // 独立投影说明可用性和登记规则状态；缺失附件不能使整个列表读取失败。
   private async sourcesWithContract(): Promise<SourceOption[]> {
     const out: SourceOption[] = [];
     for (const source of this.store.sources()) {
@@ -116,10 +117,11 @@ export class WorkbenchService {
       const digest = await digestOf(source.requirementsPath) ?? await digestOf(source.sourcePath);
       const stored = digest ? await readStoredContract(this.root, digest).catch(() => undefined) : undefined;
       // A registered interpretation already is a confirmed baseline; a contract only covers unmapped documents.
-      const registered = source.requirementsPath
-        ? await workingProfile(await readFile(source.requirementsPath, "utf8"), Number(new Date().getFullYear())).catch(() => undefined)
+      const requirementsText = source.requirementsPath ? await readFile(source.requirementsPath, "utf8").catch(() => undefined) : undefined;
+      const registered = requirementsText
+        ? await workingProfile(requirementsText, Number(new Date().getFullYear())).catch(() => undefined)
         : undefined;
-      out.push(publicSource({
+      out.push(await publicSource({
         ...source,
         ...(registered && !registered.unsupported
           ? { contractStatus: "confirmed" as const, contractVersion: registered.version }
@@ -226,8 +228,11 @@ export class WorkbenchService {
     if (!selected || selected.sourceSignature !== selection.sourceSignature || selected.sourceSha256 !== selection.sourceSha256) throw stalePlan();
     return selected;
   }
+  // 创建只保存会话；不可用来源不能进入会话，不派发执行。
   async create(sourceId: string, title?: string, selection?: PlanSelection): Promise<ConversationDetail> {
     const source = this.store.source(sourceId);
+    const available = await publicSource(source);
+    if (!available.supported) throw new WebError(422, available.reason ?? "该文件暂不可用。");
     if (!selection && !source.requirementsPath && (await this.availablePlanMatches(sourceId)).selection === "multiple")
       throw new WebError(409, "存在多个精确匹配方案，请先手动选择方案后继续。");
     const plan = selection ? await this.validatePlan(sourceId,selection) : undefined;

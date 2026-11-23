@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { constants, mkdirSync } from "node:fs";
+import { access, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { ChatMessage, ConversationSummary, SourceOption } from "./types.js";
@@ -10,7 +11,7 @@ export class WebError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
 }
 
-export type RegisteredSource = SourceOption & { sourcePath: string; requirementsPath?: string };
+export type RegisteredSource = Omit<SourceOption, "hasRequirements"> & { sourcePath: string; requirementsPath?: string };
 export type Job = {
   id: string; conversationId: string; requestId: string; content: string;
   state: "ADMITTED" | "RUNNING" | "COMPLETED" | "FAILED" | "INTERRUPTED";
@@ -154,7 +155,20 @@ export class ConversationStore {
   }
 }
 
-export function publicSource({ sourcePath: _source, requirementsPath: _requirements, ...source }: RegisteredSource): SourceOption { return source; }
+// 从已保存引用核对说明与原文件可用性；不把名称或契约状态当作附件事实。
+export async function publicSource({ sourcePath, requirementsPath, ...source }: RegisteredSource): Promise<SourceOption> {
+  let hasRequirements = false;
+  if (requirementsPath) {
+    try {
+      const text = new TextDecoder("utf-8", { fatal: true }).decode(await readFile(requirementsPath));
+      hasRequirements = Boolean(text.trim()) && Buffer.byteLength(text) <= 64 * 1024 && !text.includes("\0");
+    } catch { /* 配套说明不可读时仅将当前来源标为不可用，不影响其他来源。 */ }
+  }
+  const sourceAvailable = await access(sourcePath, constants.R_OK).then(() => true, () => false);
+  const reason = !sourceAvailable ? "原文件未找到或不可读取，请检查本机文件。"
+    : requirementsPath && !hasRequirements ? "配套抽取说明缺失、不可读取或内容无效，请检查本机说明。" : source.reason;
+  return { ...source, hasRequirements, supported: source.supported && sourceAvailable && (!requirementsPath || hasRequirements), ...(reason ? { reason } : {}) };
+}
 
 export function safeError(error: unknown): string {
   if (error instanceof WebError || error instanceof PlanError) return error.message;

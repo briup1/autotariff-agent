@@ -6,6 +6,7 @@ export type SourceOption = {
   label: string;
   filename: string;
   requirementsName: string;
+  hasRequirements: boolean;
   kind: "sample" | "upload";
   templateName: string;
   supported: boolean;

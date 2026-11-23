@@ -6,12 +6,13 @@ import { DatabaseSync } from "node:sqlite";
 import { request } from "node:http";
 import { createWorkbenchServer } from "../src/web/server.js";
 import { WorkbenchService, type RunJobContext, type WorkbenchOptions } from "../src/web/service.js";
-import { ArtifactStore } from "../src/closure/artifacts.js";
+import { ArtifactStore, digest } from "../src/closure/artifacts.js";
+import { runProcess } from "../src/closure/execute.js";
 import { ClosureController } from "../src/closure/controller.js";
 import { DEFAULT_BUDGET } from "../src/closure/runtime.js";
 import { PROJECT_ROOT, PYTHON, runsRootFor } from "../src/closure/paths.js";
 import { exportRecords } from "../src/closure/spreadsheet.js";
-import { writeStoredContract, type Contract } from "../src/closure/contract.js";
+import { writeStoredContract, approveStoredContract, type Contract } from "../src/closure/contract.js";
 import { VISUAL_TASK_ID } from "../src/closure/live-budget.js";
 import type { ConversationDetail, RunDetail } from "../src/web/types.js";
 
@@ -195,6 +196,75 @@ async function makeCandidateRun(context: RunJobContext, requirementsDigest: stri
     expect((await post("/api/conversations", { sourceId: "/etc/passwd" })).status).toBe(404);
     expect((await fetch(url + "/.env.local")).status).toBe(404);
     expect((await fetch(url + "/api/tests/not-registered")).status).toBe(404);
+  });
+
+  it("derives explanation metadata from saved attachments and performs no execution before sending", async () => {
+    // 在空临时根目录生成仓库自带合成数据，不访问相邻业务仓库或真实模型。
+    await runProcess(PYTHON, ["-I", resolve(PROJECT_ROOT, "src/workers/fixtures.py"), resolve(root, "live-fixtures")]);
+    const bytes = await readFile(resolve(root, "live-fixtures/small.xlsx"));
+    let calls = 0;
+    await start({ sources: [], runner: async () => { calls++; } });
+    const imported = [];
+    for (const attachment of [
+      { requirementsName: "valid.txt", requirementsText: "本地合成抽取说明" },
+      {},
+      { requirementsName: "named-but-empty.txt", requirementsText: "  \n\t" },
+    ]) {
+      const response = await post("/api/uploads", { name: "small.xlsx", base64: bytes.toString("base64"), ...attachment });
+      expect(response.status).toBe(201);
+      imported.push(await response.json());
+    }
+    expect(imported.map((source) => source.hasRequirements)).toEqual([true, false, false]);
+    expect(imported[0].contractStatus).toBe("missing");
+    for (const source of imported) {
+      expect(source.sourcePath).toBeUndefined();
+      expect(source.requirementsPath).toBeUndefined();
+      const plans = await fetch(url + `/api/sources/${source.id}/plans`);
+      expect(plans.status).toBe(200);
+      expect(await plans.json()).toMatchObject({ plans: [], selection: "none" });
+    }
+    let bootstrap = await (await fetch(url + "/api/bootstrap")).json();
+    expect(bootstrap.sources.map((source: any) => source.hasRequirements)).toEqual([true, false, false]);
+    const key = digest(bytes);
+    await writeStoredContract(root, { version: "offline-confirmed", requirementsDigest: key, requirementsSource: "observed", fields: [{ name: "port", role: "text", aliases: ["PORT"], required: true }], route: { kind: "columns", separators: [] }, checks: [] });
+    await approveStoredContract(root, key, "offline-test");
+    bootstrap = await (await fetch(url + "/api/bootstrap")).json();
+    expect(bootstrap.sources[0]).toMatchObject({ hasRequirements: true, contractStatus: "missing" });
+    expect(bootstrap.sources[1]).toMatchObject({ hasRequirements: false, contractStatus: "confirmed" });
+    for (const source of imported) {
+      const response = await post("/api/conversations", { sourceId: source.id });
+      expect(response.status).toBe(201);
+      const created = await response.json();
+      const reloaded = await (await fetch(url + `/api/conversations/${created.conversation.id}`)).json();
+      expect(reloaded.messages).toEqual([]);
+      expect(reloaded.runs).toEqual([]);
+    }
+    expect(calls).toBe(0);
+    expect(app!.service.store.jobs()).toEqual([]);
+    expect(app!.service.plans.ledger.db.prepare("SELECT COUNT(*) AS total FROM runs").get()).toMatchObject({ total: 0 });
+    const current = app!.service.store.conversations()[0];
+    expect((await post(`/api/conversations/${current.id}/messages`, { requestId: "explicit-send", content: "抽取合成原文件" })).status).toBe(202);
+    await app!.service.idle();
+    expect(calls).toBe(1);
+  });
+
+  it("keeps missing sources local to their entries and refuses creating unavailable input", async () => {
+    // 模拟旧保存记录：说明存在性没有持久化字段，仍从已有引用推导。
+    const available = options().sources![0];
+    await start({ sources: [available,
+      { ...available, id: "missing-source", sourcePath: resolve(root, "absent.xlsx") },
+      { ...available, id: "missing-requirements", requirementsPath: resolve(root, "absent.txt") },
+    ] });
+    const response = await fetch(url + "/api/bootstrap");
+    expect(response.status).toBe(200);
+    const { sources } = await response.json();
+    expect(sources[0]).toMatchObject({ supported: true, hasRequirements: true });
+    expect(sources[1]).toMatchObject({ supported: false, reason: expect.stringContaining("原文件") });
+    expect(sources[2]).toMatchObject({ supported: false, hasRequirements: false, reason: expect.stringContaining("配套抽取说明") });
+    expect(JSON.stringify(sources)).not.toContain(root);
+    expect((await post("/api/conversations", { sourceId: "missing-source" })).status).toBe(422);
+    expect((await post("/api/conversations", { sourceId: "missing-requirements" })).status).toBe(422);
+    expect((await post("/api/conversations", { sourceId: available.id })).status).toBe(201);
   });
 
   it("imports signed uploads, admits unknown requirements as a contractless document, and uses registered input", async () => {

@@ -9,6 +9,7 @@ import type { PlanSelection } from "../closure/plan-types.js";
 
 const MAX_BODY = 21 * 1024 * 1024;
 
+// 启动仅回环工作台并提供来源、会话和显式发送接口。
 export async function createWorkbenchServer(options: WorkbenchOptions = {}) {
   const service = new WorkbenchService(options);
   try { await service.initialize(); }
@@ -16,6 +17,7 @@ export async function createWorkbenchServer(options: WorkbenchOptions = {}) {
   const server = createServer((request, response) => { void handle(request, response); });
   server.requestTimeout = 30000;
   server.headersTimeout = 15000;
+  // 校验本机请求后分派 API；导入不等于发送执行要求。
   async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("Cache-Control", "no-store");
@@ -86,7 +88,7 @@ export async function createWorkbenchServer(options: WorkbenchOptions = {}) {
           if (!/^[\w-]+$/.test(requestId)) throw new WebError(400, "请求标识无效。");
           return json(response, 202, await service.send(message[1], requestId, string(body, "content", 16000),planSelection(body)));
         }
-        if (path === "/api/uploads") return json(response, 201, await service.upload(string(body, "name", 180), string(body, "base64", 20 * 1024 * 1024), optionalString(body, "requirementsName", 180), optionalString(body, "requirementsText", 64 * 1024)));
+        if (path === "/api/uploads") return json(response, 201, await service.upload(string(body, "name", 180), string(body, "base64", 20 * 1024 * 1024), optionalString(body, "requirementsName", 180), optionalRequirementsText(body)));
         if (path === "/api/contracts/approve") {
           const runId = string(body, "runId", 128);
           const digestValue = string(body, "requirementsDigest", 64);
@@ -152,6 +154,13 @@ async function readBody(request: IncomingMessage): Promise<Record<string, unknow
 function string(body: Record<string, unknown>, key: string, maximum: number): string {
   const value = body[key];
   if (typeof value !== "string" || !value.trim() || value.length > maximum) throw new WebError(400, `${key} 不能为空且不能超过 ${maximum} 字符。`);
+  return value;
+}
+// 可选说明允许空白表示未附；仍校验类型、大小和非法文本。
+function optionalRequirementsText(body: Record<string, unknown>): string | undefined {
+  const value = body.requirementsText;
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || Buffer.byteLength(value) > 64 * 1024 || value.includes("\0")) throw new WebError(400, "说明必须是 64 KiB 以内的文本。");
   return value;
 }
 function optionalString(body: Record<string, unknown>, key: string, maximum: number): string | undefined {

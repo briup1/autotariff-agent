@@ -867,6 +867,7 @@ function closeSidebar() {
   $('sidebar').removeAttribute('role');
   $('sidebar').removeAttribute('aria-modal');
 }
+// 每次打开都重新读取当前文件的方案与引导，不沿用上次弹窗状态。
 function openSourceDialog() {
   if (state.sourceBusy) return;
   state.sourceMode = 'sample';
@@ -877,6 +878,7 @@ function openSourceDialog() {
   closeSidebar();
   if (!$('source-dialog').open) $('source-dialog').showModal();
 }
+// 切换入口时清空导入身份和方案状态，等待新文件事实。
 function setSourceMode(mode) {
   state.sourceMode = mode;
   document.querySelectorAll('[data-source-mode]').forEach((button) => {
@@ -885,26 +887,34 @@ function setSourceMode(mode) {
     button.setAttribute('aria-pressed', String(active));
   });
   $('sample-fields').hidden = mode !== 'sample';
+  $('source-detail').hidden = mode !== 'sample';
   $('upload-fields').hidden = mode !== 'upload';
   $('source-select').required = mode === 'sample';
   $('original-file').required = mode === 'upload';
   $('requirements-file').required = false;
   $('source-error').hidden = true;
-  renderSourceDetail();
   state.uploadSourceId = null;
+  renderSourceDetail();
   state.sourcePlanSelection = 'none';
   state.sourcePlanPreselected = '';
   if (mode === 'sample') void loadSourcePlans($('source-select').value);
-  else { state.sourcePlanEpoch = (state.sourcePlanEpoch || 0) + 1; state.sourcePlanChoices = []; $('source-plan-fields').hidden = true; }
+  else { state.sourcePlanEpoch = (state.sourcePlanEpoch || 0) + 1; state.sourcePlanChoices = []; state.sourcePlansStatus = 'idle'; $('source-plan-select').value = ''; $('source-plan-detail').textContent = ''; $('source-plan-fields').hidden = true; }
   $('create-conversation').textContent = mode === 'upload' ? '导入并选择方案' : '创建会话';
 }
+// 沿用请求代次隔离快速切换，读取完成前不推断首次观察。
 async function loadSourcePlans(sourceId) {
   const epoch = (state.sourcePlanEpoch || 0) + 1;
   state.sourcePlanEpoch = epoch;
   state.sourcePlanChoices = [];
   state.sourcePlanSelection = 'none';
   state.sourcePlanPreselected = '';
-  $('source-plan-fields').hidden = true;
+  state.sourcePlansStatus = sourceId ? 'loading' : 'idle';
+  const pendingOption = el('option', '', '不使用方案'); pendingOption.value = '';
+  $('source-plan-select').replaceChildren(pendingOption);
+  $('source-plan-select').value = '';
+  $('source-plan-detail').textContent = sourceId ? '正在读取当前文件的方案…' : '';
+  $('source-plan-fields').hidden = !sourceId;
+  $('source-error').hidden = true;
   if (!sourceId) return;
   try {
     const data = await api(`/api/sources/${encodeURIComponent(sourceId)}/plans`);
@@ -912,7 +922,8 @@ async function loadSourcePlans(sourceId) {
     state.sourcePlanChoices = data.plans || [];
     state.sourcePlanSelection = data.selection || 'none';
     state.sourcePlanPreselected = data.preselectedPlanVersionId || '';
-    const none = el('option', '', '不使用方案，沿用说明或首次观察'); none.value = '';
+    state.sourcePlansStatus = 'ready';
+    const none = el('option', '', '不使用方案'); none.value = '';
     $('source-plan-select').replaceChildren(none, ...state.sourcePlanChoices.map((plan) => {
       const option = el('option', '', `${plan.name} · ${plan.supplier} · ${plan.docType} · ${plan.contractVersion}`);
       option.value = plan.planVersionId;
@@ -922,40 +933,62 @@ async function loadSourcePlans(sourceId) {
     $('source-plan-fields').hidden = false;
     renderSourcePlan();
   } catch (error) {
-    if (state.sourcePlanEpoch === epoch) { $('source-error').textContent = `方案暂不可读取：${error.message}；可重试，或不使用方案继续。`; $('source-error').hidden = false; }
+    if (state.sourcePlanEpoch === epoch) { state.sourcePlansStatus = 'error'; $('source-plan-detail').textContent = '方案读取失败，当前下一步尚未确定。'; $('source-error').textContent = `方案暂不可读取：${error.message}；可重试，或不使用方案继续。`; $('source-error').hidden = false; }
   }
 }
+// 只根据当前文件事实和本轮匹配结果解释下一步，不改变服务端规则优先级。
 function renderSourcePlan() {
+  const sourceId = state.sourceMode === 'upload' ? state.uploadSourceId : $('source-select').value;
+  const source = state.bootstrap?.sources.find((entry) => entry.id === sourceId);
   const plan = state.sourcePlanChoices?.find((entry) => entry.planVersionId === $('source-plan-select').value);
-  const note = state.sourcePlanSelection === 'unique'
-    ? '已预选唯一精确匹配，请核对后继续；系统不会静默运行。'
-    : state.sourcePlanSelection === 'multiple'
-      ? '发现多个精确匹配方案，请手动选择；系统不会按最近使用时间代选。'
-      : '';
-  $('source-plan-detail').textContent = plan
-    ? `${note}${note ? ' ' : ''}将使用 ${plan.name} · 供应商 ${plan.supplier} · 单证 ${plan.docType} · 规则 ${plan.contractVersion}。发送消息后执行。`
-    : note ||
-      (state.sourcePlanChoices?.length ? '请明确选择方案。系统不会自动替你选择。' : '当前没有可用方案，可继续首次观察与确认。');
+  let text;
+  if (source && !source.supported) text = `暂不可用：${source.reason || '请检查原文件与配套说明。'}`;
+  else if (state.sourcePlansStatus !== 'ready') text = state.sourcePlansStatus === 'error' ? '方案读取失败，当前下一步尚未确定。' : '正在读取当前文件的方案…';
+  else if (plan) text = `${state.sourcePlanPreselected === plan.planVersionId ? '已预选唯一精确匹配。' : ''}将使用 ${plan.name} · 供应商 ${plan.supplier} · 单证 ${plan.docType} · 规则 ${plan.contractVersion}。请核对后创建会话；发送要求才可能执行。`;
+  else if (state.sourcePlanSelection === 'multiple') text = '发现多个精确匹配方案，请先手动选择方案后继续；系统不会按最近使用时间代选。';
+  else if (source?.hasRequirements === true) text = '将按附带抽取说明继续。创建会话后发送抽取要求；已附说明不代表规则已经人工确认。';
+  else if (source?.hasRequirements === false && source.contractStatus === 'confirmed') text = '已有已确认规则可沿用。请核对后创建会话，发送抽取要求才可能执行。';
+  else if (source?.hasRequirements === false && ['missing', 'candidate'].includes(source.contractStatus)) text = '创建会话并发送抽取要求后，会先观察原文，生成候选规则供人工确认；不代表已观察或已批准，也不保证抽取成功。';
+  else text = '当前文件状态尚未确定，请核对文件与说明状态。';
+  $('source-plan-detail').textContent = text;
 }
+// 保留业务名称，上传来源仅增加可辨认的导入标记。
 function refreshSources() {
   const sources = state.bootstrap?.sources || [];
   const selected = $('source-select').value || sources.find((source) => source.supported)?.id || sources[0]?.id;
-  syncSelect($('source-select'), sources.map((source) => ({ value: source.id, label: `${source.kind === 'upload' ? '已上传' : '试点'} · ${source.label}${source.supported ? '' : '（暂不可用）'}` })), selected, '没有可选择的文件');
+  syncSelect($('source-select'), sources.map((source) => ({ value: source.id, label: `${source.kind === 'upload' ? '已上传 · ' : ''}${source.label}${source.supported ? '' : '（暂不可用）'}` })), selected, '没有可选择的文件');
   renderSourceDetail();
 }
+// 导入后使用刚保存的上传身份，说明状态来自服务端附件事实。
 function renderSourceDetail() {
-  const source = state.bootstrap?.sources.find((item) => item.id === $('source-select').value);
+  const sourceId = state.sourceMode === 'upload' ? state.uploadSourceId : $('source-select').value;
+  const source = state.bootstrap?.sources.find((item) => item.id === sourceId);
   const content = $('source-detail');
   content.replaceChildren();
+  content.hidden = !source && state.sourceMode === 'upload';
   if (source) {
     const original = el('p');
     original.append(el('strong', '', '原文件 '), document.createTextNode(source.filename));
-    const requirements = el('p');
-    requirements.append(el('strong', '', '抽取说明 '), document.createTextNode(source.requirementsName));
-    content.append(original, requirements);
-    if (!source.supported) content.append(el('p', '', source.reason || '当前规则尚不支持此文件。请选择支持的试点。'));
-  } else content.append(el('p', '', '可以上传一个原文件和对应的抽取说明。'));
-  $('create-conversation').disabled = state.sourceBusy || (state.sourceMode === 'sample' && !source?.supported);
+    content.append(original, el('p', '', !source.supported ? '暂不可用' : source.hasRequirements ? '已附抽取说明' : '未附抽取说明'));
+    if (source.hasRequirements) content.append(el('p', '', `说明文件 ${source.requirementsName}`));
+    if (source.id === 'sample-controlled') content.append(el('p', '', '合成演示数据，非真实业务数据'));
+    if (!source.supported) content.append(el('p', '', source.reason || '请检查原文件与配套说明。'));
+  } else content.append(el('p', '', '可以上传一个原文件，抽取说明可选。'));
+  $('create-conversation').disabled = state.sourceBusy || (source ? !source.supported : state.sourceMode === 'sample');
+}
+// 上传输入改变后必须重新导入，不把上次副本的说明状态用于新文件。
+function resetUploadSource() {
+  state.uploadSourceId = null;
+  state.sourcePlanEpoch = (state.sourcePlanEpoch || 0) + 1;
+  state.sourcePlanChoices = [];
+  state.sourcePlanSelection = 'none';
+  state.sourcePlanPreselected = '';
+  state.sourcePlansStatus = 'idle';
+  $('source-plan-select').value = '';
+  $('source-plan-detail').textContent = '';
+  $('source-plan-fields').hidden = true;
+  $('create-conversation').textContent = '导入并选择方案';
+  renderSourceDetail();
 }
 function readBase64(file) {
   return new Promise((resolve, reject) => {
@@ -965,6 +998,7 @@ function readBase64(file) {
     reader.readAsDataURL(file);
   });
 }
+// 上传只导入一次，留在方案步骤；再次提交才创建空会话。
 async function createConversation(event) {
   event.preventDefault();
   if (state.sourceBusy) return;
@@ -997,6 +1031,7 @@ async function createConversation(event) {
       if (!imported.supported) throw new Error(imported.reason || '文件已导入，但该文件暂不支持。');
       sourceId = imported.id;
       state.uploadSourceId = imported.id;
+      renderSourceDetail();
       await loadSourcePlans(sourceId);
       return;
     }
@@ -1731,7 +1766,8 @@ $('close-source').addEventListener('click', () => { if (!state.sourceBusy) $('so
 $('source-form').addEventListener('submit', createConversation);
 $('source-select').addEventListener('change', () => { renderSourceDetail(); void loadSourcePlans($('source-select').value); });
 $('source-plan-select').addEventListener('change', renderSourcePlan);
-$('original-file').addEventListener('change', () => { state.uploadSourceId = null; state.sourcePlanEpoch = (state.sourcePlanEpoch || 0) + 1; state.sourcePlanChoices = []; $('source-plan-fields').hidden = true; $('create-conversation').textContent = '导入并选择方案'; });
+$('original-file').addEventListener('change', resetUploadSource);
+$('requirements-file').addEventListener('change', resetUploadSource);
 $('source-dialog').addEventListener('cancel', (event) => { if (state.sourceBusy) event.preventDefault(); });
 $('message-form').addEventListener('submit', sendMessage);
 $('message-input').addEventListener('input', () => { saveDraft(); renderComposer(); });
