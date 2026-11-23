@@ -107,3 +107,39 @@ agent-browser --session 003-issue-builder press Enter
 | 样式与请求隔离 | Excel 原列序与工作会话原表头色不变；本轮记录10条请求全部 GET。 | `round-2-requests.json` |
 
 新增前端回归用例覆盖手机视图往返、跨断点状态和监听注册；最终定向回归25项通过，完整门禁类型检查通过、28文件238项测试通过，`git diff --check` 通过。浏览器已关闭且仅停止5130监听进程。
+
+## 第 3 轮：加载中的证据跳转与静态读取失败
+
+第2轮UI审查通过；代码审查发现刷新按钮在换轮／翻页请求期间会禁用，因此不适合作为稳定的键盘跳转目标。本轮将证据入口改为「跳到工作证据」→ `#evidence-title`，标题设置 `tabindex="-1"`，可由跳转聚焦但不额外增加常规Tab停靠；对话入口、跨767px同步和核价布局不变。上述第2轮刷新目标记录是该轮历史事实，最终目标以本节为准。
+
+### 实际浏览器复测
+
+仍启动相同的只读合成服务并使用 `agent-browser --session 003-issue-builder`。加载完成后用 `eval` 临时包装浏览器 `window.fetch`：仅 `/api/runs/` 请求保留在Promise中，调用 `window.releaseRun()` 后才转发原始同源GET；未改生产代码，也不提交消息或调用模型。
+
+```bash
+agent-browser --session 003-issue-builder set viewport 1600 760
+agent-browser --session 003-issue-builder open 'http://127.0.0.1:5130/?run=synthetic-history'
+agent-browser --session 003-issue-builder select '#attempt-select' a1
+agent-browser --session 003-issue-builder focus '.skip-link'
+agent-browser --session 003-issue-builder press Enter
+agent-browser --session 003-issue-builder eval 'window.releaseRun();true'
+agent-browser --session 003-issue-builder scrollintoview '.pagination'
+agent-browser --session 003-issue-builder click '.pagination button:last-child'
+agent-browser --session 003-issue-builder focus '.skip-link'
+agent-browser --session 003-issue-builder press Enter
+```
+
+| 场景 | 实际结论 | 证据 |
+| --- | --- | --- |
+| 1600×760换轮等待 | PASS。刷新disabled=true时，Enter后焦点为可见的 `evidence-title`，tabIndex=-1，文案为「跳到工作证据」。 | `round-3-pending-attempt-focus.png`、`round-3-measurements.json` |
+| 1600×760翻页等待 | PASS。刷新disabled=true时，Enter仍聚焦可见证据标题；释放请求后显示XIAMEN，分页链路保持。 | `round-3-measurements.json`、`round-3-requests.json` |
+| 390×844换轮等待 | PASS。刷新disabled=true时，Enter聚焦可见证据标题；释放后返回SHANGHAI。 | `round-3-mobile-pending-focus.png`、读数JSON |
+| 对话与跨断点 | PASS。手机对话仍跳到message-input；390→1600→执行过程→结果→390后聊天非inert，跳转仍聚焦消息输入，根宽390。 | 读数JSON |
+| 原核价体验 | PASS。1600×760表格宽1310、核心x=282.53–971.89、两行y=607.30–694.80，表头仍为 `rgb(78,104,136)`。 | `round-3-desktop.png`、读数JSON |
+| 只读边界 | PASS。10条请求全部GET，无模型、消息提交或启动抽取。 | `round-3-requests.json` |
+
+### 错误处理回归
+
+合成服务静态分支先完成 `readFile()` 再发送200，失败由原请求处理回调发送一次500。新增 `tests/history-result-review.test.ts` 装载真实 `respond()` 与 `createServer` 回调、注入静态读取失败；响应替身会像HTTP响应一样拒绝第二次发送头。断言首请求仅 `[500]` 且包含失败原因，随后同处理函数请求返回 `[200]` 和完整静态内容，无未处理拒绝。前端测试另外执行真实 `selectAttempt()`／`loadRun()` 并延迟响应，验证刷新禁用期间跳转仍指向带 `tabindex=-1` 的标题。
+
+执行 `npm exec vitest run tests/web-client.test.ts tests/history-result-review.test.ts tests/plan-review-client.test.ts tests/web.test.ts`，4文件27项通过；最终 `bash /Users/ziyun/workdir/remote_project/autotariff-agent/factory/checks.sh` 类型检查与29文件240项测试全部通过，`git diff --check`通过。浏览器已关闭，仅停止5130监听进程；不修改后端、交付账本或历史产物。

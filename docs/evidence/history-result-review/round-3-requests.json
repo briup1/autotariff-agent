@@ -1,0 +1,46 @@
+{
+  "workbook": ".tmp/runtime/run.xQfz3V6a/history-result-review-79ZvDQ/synthetic-result.xlsx",
+  "sha256": "14b06b287efe1e161b640c95735271b4de657e882f6e05763fd1006e92c1e347",
+  "requests": [
+    {
+      "method": "GET",
+      "url": "/?run=synthetic-history"
+    },
+    {
+      "method": "GET",
+      "url": "/styles.css"
+    },
+    {
+      "method": "GET",
+      "url": "/app.js"
+    },
+    {
+      "method": "GET",
+      "url": "/api/bootstrap"
+    },
+    {
+      "method": "GET",
+      "url": "/favicon.ico"
+    },
+    {
+      "method": "GET",
+      "url": "/api/runs/synthetic-history?offset=0&limit=50"
+    },
+    {
+      "method": "GET",
+      "url": "/api/runs/synthetic-history?offset=0&limit=50&attempt=a1"
+    },
+    {
+      "method": "GET",
+      "url": "/api/runs/synthetic-history?offset=2&limit=50&attempt=a1"
+    },
+    {
+      "method": "GET",
+      "url": "/api/runs/synthetic-history?offset=0&limit=50&attempt=a2"
+    },
+    {
+      "method": "GET",
+      "url": "/verification-requests"
+    }
+  ]
+}

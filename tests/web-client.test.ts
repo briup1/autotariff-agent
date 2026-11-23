@@ -116,17 +116,17 @@ it("keeps skip-link labels and chat accessibility in sync across mobile views an
   const client = await resultClient();
   client.viewport.narrow = true;
   client.mobile("results");
-  expect(client.nodes.get(".skip-link")).toMatchObject({ href: "#refresh-run", textContent: "跳到证据刷新" });
+  expect(client.nodes.get(".skip-link")).toMatchObject({ href: "#evidence-title", textContent: "跳到工作证据" });
   expect(client.nodes.get(".chat-panel").inert).toBe(true);
   client.mobile("chat");
   expect(client.nodes.get(".skip-link")).toMatchObject({ href: "#message-input", textContent: "跳到消息输入" });
   expect(client.nodes.get(".chat-panel").inert).toBe(false);
   client.mobile("results");
-  expect(client.nodes.get(".skip-link").href).toBe("#refresh-run");
+  expect(client.nodes.get(".skip-link").href).toBe("#evidence-title");
   client.mobile("chat");
   client.viewport.narrow = false; client.layout();
   expect(client.nodes.get(".chat-panel").inert).toBe(true);
-  expect(client.nodes.get(".skip-link")).toMatchObject({ href: "#refresh-run", textContent: "跳到证据刷新" });
+  expect(client.nodes.get(".skip-link")).toMatchObject({ href: "#evidence-title", textContent: "跳到工作证据" });
   client.state.evidenceTab = "activity"; client.layout();
   expect(client.nodes.get(".chat-panel").inert).toBe(false);
   client.state.evidenceTab = "results"; client.layout();
@@ -136,4 +136,25 @@ it("keeps skip-link labels and chat accessibility in sync across mobile views an
   expect(client.nodes.get(".skip-link")).toMatchObject({ href: "#message-input", textContent: "跳到消息输入" });
   const source = await readFile(resolve(PROJECT_ROOT, "web/app.js"), "utf8");
   expect(source).toContain("matchMedia('(max-width:767px)').addEventListener('change', renderHistoryResultsLayout)");
+});
+
+it("keeps the evidence skip target focusable while an attempt or page request is pending", async () => {
+  const source = await readFile(resolve(PROJECT_ROOT, "web/app.js"), "utf8");
+  const html = await readFile(resolve(PROJECT_ROOT, "web/index.html"), "utf8");
+  expect(html).toContain('<h2 id="evidence-title" tabindex="-1">工作证据</h2>');
+  for (const operation of ["selectAttempt('a1')", "state.offset = 2; loadRun(state.runId, { preserve: true })"]) {
+    const nodes = new Map<string, any>();
+    const get = (id: string) => { if (!nodes.has(id)) nodes.set(id, { dataset: {}, value: "", textContent: "", classList: { toggle() {} } }); return nodes.get(id); };
+    const state: any = { selection: null, mobileTab: "results", evidenceTab: "results", runId: "synthetic-history", offset: 0, runEpoch: 0, run: { run: { origin: "history", sourceName: "合成" } } };
+    const requests: string[] = [];
+    const context = createContext({ state, $: get, URLSearchParams, matchMedia: () => ({ matches: true }), document: { querySelector: get },
+      api: (url: string) => { requests.push(url); return new Promise(() => {}); },
+      renderEvidence: () => { runInContext("renderHistoryResultsLayout()", context); get("refresh-run").disabled = state.runLoading; } });
+    runInContext(source.slice(source.indexOf("function historyResultsMode("), source.indexOf("// 更新证据内容")) + source.slice(source.indexOf("async function loadRun("), source.indexOf("function setEvidenceTab(")), context);
+    runInContext(operation, context);
+    expect(state.runLoading).toBe(true);
+    expect(get("refresh-run").disabled).toBe(true);
+    expect(get(".skip-link")).toMatchObject({ href: "#evidence-title", textContent: "跳到工作证据" });
+    expect(requests[0]).toContain(operation.startsWith("selectAttempt") ? "attempt=a1" : "offset=2");
+  }
 });

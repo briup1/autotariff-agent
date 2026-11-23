@@ -444,8 +444,8 @@ function renderHistoryResultsLayout() {
   $('history-result-source').textContent = active ? state.run.run.sourceName : '';
   $('history-result-source').title = $('history-result-source').textContent;
   const skip = document.querySelector('.skip-link');
-  skip.href = chatVisible ? '#message-input' : '#refresh-run';
-  skip.textContent = chatVisible ? '跳到消息输入' : '跳到证据刷新';
+  skip.href = chatVisible ? '#message-input' : '#evidence-title';
+  skip.textContent = chatVisible ? '跳到消息输入' : '跳到工作证据';
 }
 // 更新证据内容前同步布局，避免渲染缓存保留上一页的模式。
 function renderEvidence() {

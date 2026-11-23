@@ -51,8 +51,9 @@ async function respond(req, res) {
     body = { path, kind: 'result-xlsx', bytes: xlsx.length, truncated: false, sheets: [{ name: '合成报价', rows: [keys, ...records.map((row) => keys.map((key) => row[key] ?? null))], totalRows: 3, totalColumns: keys.length, truncated: false }] };
   } else if (url.pathname === '/verification-requests') body = { workbook, sha256, requests: (await readFile(log, 'utf8')).trim().split('\n').map((line) => JSON.parse(line)) };
   else if (['/', '/app.js', '/styles.css'].includes(url.pathname)) {
+    const content = await readFile(resolve(root, 'web', url.pathname === '/' ? 'index.html' : url.pathname.slice(1)));
     res.writeHead(200, { 'Content-Type': url.pathname === '/' ? 'text/html; charset=utf-8' : url.pathname.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8' });
-    res.end(await readFile(resolve(root, 'web', url.pathname === '/' ? 'index.html' : url.pathname.slice(1)))); return;
+    res.end(content); return;
   } else { res.writeHead(404); res.end('合成核验未提供此资源'); return; }
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(body));
 }
