@@ -9,6 +9,8 @@
 .formatted-message{white-space:normal}.formatted-message p{margin:0 0 12px}.formatted-message h3{font-size:16px;line-height:1.5;margin:22px 0 10px}.formatted-message h3:first-child{margin-top:0}.formatted-message ul{margin:0 0 14px;padding-left:22px}.formatted-message li{margin:4px 0}.formatted-message code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em;background:#edf2fa;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere}.formatted-message pre{max-width:100%;overflow:auto;background:#edf2fa;border:1px solid var(--border);border-radius:8px;padding:14px;margin:12px 0;white-space:pre;line-height:1.6}.formatted-message pre code{padding:0;background:none;overflow-wrap:normal}
 [hidden]{display:none!important}
 
+.result-table td.result-date-hint{min-width:180px;max-width:230px;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.8;color:var(--amber)}
+.result-date-hint strong{display:block;font-weight:600}
 .result-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:0 0 16px}
 .result-actions .primary-button{min-height:36px;font-size:11px;padding:8px 13px}
 .artifact-content.sheet{white-space:normal;padding:16px 20px}
