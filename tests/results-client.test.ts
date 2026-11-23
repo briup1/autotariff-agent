@@ -239,6 +239,7 @@ it.each(['missing', 'error', 'available'])('renders workbook state %s independen
   expect(text(h.root())).toContain('Rates!R3C1');
   expect(text(h.root()).includes('本轮未生成结果工作簿')).toBe(xlsxStatus === 'missing');
   expect(text(h.root()).includes('已登记但缺失或校验失败')).toBe(xlsxStatus === 'error');
+  expect(find(h.root(), n => n.className === 'evidence-note result-workbook-note')).toHaveLength(xlsxStatus === 'available' ? 0 : 1);
   const downloads = links(h.root());
   expect(downloads.map(item => item.label)).toEqual([xlsxStatus === 'available' ? '下载结果 Excel' : '下载最终 JSON']);
   expect(Object.fromEntries(downloads[0].url.searchParams)).toEqual({ runId: 'r1', path: xlsxStatus === 'available' ? 'saved/book.xlsx' : 'saved/complete.json', download: '1' });

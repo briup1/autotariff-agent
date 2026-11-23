@@ -603,7 +603,7 @@ function renderResults() {
     bar.append(xlsx, preview);
     fragment.append(bar);
   } else {
-    fragment.append(el('p', 'evidence-note', attempt.xlsxStatus === 'error' ? '本轮结果工作簿已登记但缺失或校验失败。' : '本轮未生成结果工作簿'));
+    fragment.append(el('p', 'evidence-note result-workbook-note', attempt.xlsxStatus === 'error' ? '本轮结果工作簿已登记但缺失或校验失败。' : '本轮未生成结果工作簿'));
     if (attempt.finalResultPath) {
       const bar = el('div', 'result-actions');
       const json = el('a', 'primary-button', '下载最终 JSON');
